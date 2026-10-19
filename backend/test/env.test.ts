@@ -23,6 +23,52 @@ describe("loadEnv", () => {
   });
 });
 
+describe("loadEnv: origens e proxy", () => {
+  it("padrão de desenvolvimento: origem do Vite e TRUST_PROXY desligado", () => {
+    const env = loadEnv(valid);
+    expect(env.ALLOWED_ORIGINS).toEqual(["http://localhost:5173"]);
+    expect(env.TRUST_PROXY).toBe(false);
+  });
+
+  it("normaliza, remove duplicatas e aceita várias origens", () => {
+    const env = loadEnv({
+      ...valid,
+      ALLOWED_ORIGINS:
+        "https://app.exemplo.com/, http://localhost:5173 ,https://app.exemplo.com",
+      TRUST_PROXY: "true",
+    });
+    expect(env.ALLOWED_ORIGINS).toEqual([
+      "https://app.exemplo.com",
+      "http://localhost:5173",
+    ]);
+    expect(env.TRUST_PROXY).toBe(true);
+  });
+
+  it("em produção ALLOWED_ORIGINS é obrigatória", () => {
+    expect(() => loadEnv({ ...valid, NODE_ENV: "production" })).toThrow(
+      /ALLOWED_ORIGINS/,
+    );
+    expect(
+      loadEnv({
+        ...valid,
+        NODE_ENV: "production",
+        ALLOWED_ORIGINS: "https://a.com",
+      }).NODE_ENV,
+    ).toBe("production");
+  });
+
+  it("rejeita origem inválida, protocolo não-HTTP e TRUST_PROXY fora de true/false", () => {
+    for (const bad of ["nao-e-url", "ftp://a.com", "https://a.com,xx"]) {
+      expect(() => loadEnv({ ...valid, ALLOWED_ORIGINS: bad })).toThrow(
+        /ALLOWED_ORIGINS/,
+      );
+    }
+    expect(() => loadEnv({ ...valid, TRUST_PROXY: "sim" })).toThrow(
+      /TRUST_PROXY/,
+    );
+  });
+});
+
 describe("server.ts com ambiente inválido", () => {
   it("encerra com código 1 e não sobe", () => {
     const r = spawnSync(

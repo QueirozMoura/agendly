@@ -2,7 +2,7 @@ import net from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.ts";
 import type { Env } from "../src/config/env.ts";
-import type { DatabaseCheck } from "../src/lib/db/ping.ts";
+import type { Database } from "../src/lib/db/database.ts";
 import { startServer, type RunningServer } from "../src/start.ts";
 
 function env(port = 0): Env {
@@ -12,11 +12,14 @@ function env(port = 0): Env {
     PORT: port,
     LOG_LEVEL: "silent",
     DATABASE_URL: "postgresql://u:p@localhost:5432/db",
+    ALLOWED_ORIGINS: ["http://localhost:5173"],
+    TRUST_PROXY: false,
   };
 }
 
-function fakeDb(overrides: Partial<DatabaseCheck> = {}) {
+function fakeDb(overrides: Partial<Database> = {}) {
   const db = {
+    prisma: {} as Database["prisma"],
     check: vi.fn(async () => {}),
     close: vi.fn(async () => {}),
     ...overrides,

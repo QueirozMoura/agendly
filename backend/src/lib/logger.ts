@@ -7,6 +7,8 @@ const REDACTED_KEYS = [
   "password",
   "newPassword",
   "token",
+  "passwordHash",
+  "tokenHash",
 ];
 
 // Cobre cabeçalhos de requisição/resposta e campos sensíveis no topo, em body e em um nível aninhado.

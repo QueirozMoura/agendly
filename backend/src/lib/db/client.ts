@@ -2,8 +2,18 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../generated/prisma/client.ts";
 
 // Único módulo de src/ que instancia PrismaClient (regra de 4.4). O Prisma 7 exige um driver adapter.
-export function createPrismaClient(connectionString: string): PrismaClient {
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+type ClientOptions = NonNullable<ConstructorParameters<typeof PrismaClient>[0]>;
+
+export function createPrismaClient(
+  connectionString: string,
+  options: Pick<ClientOptions, "log"> = {},
+): PrismaClient {
+  const adapter = new PrismaPg({
+    connectionString,
+    connectionTimeoutMillis: 2000, // não ficar pendurado esperando conexão
+    query_timeout: 10_000,
+  });
+  return new PrismaClient({ adapter, ...options });
 }
 
 export type { PrismaClient };

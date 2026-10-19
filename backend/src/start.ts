@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { buildApp as defaultBuildApp, type AppOptions } from "./app.ts";
 import type { Env } from "./config/env.ts";
-import { createDatabaseCheck, type DatabaseCheck } from "./lib/db/ping.ts";
+import { createDatabase, type Database } from "./lib/db/database.ts";
 import {
   buildLoggerOptions,
   collectSecrets,
@@ -9,7 +9,7 @@ import {
 } from "./lib/logger.ts";
 
 export interface StartDeps {
-  createDatabase?: (url: string) => DatabaseCheck;
+  createDatabase?: (url: string) => Database;
   buildApp?: (options: AppOptions) => FastifyInstance;
   /** Erros secundários (ex.: falha ao fechar recursos depois de uma falha de inicialização). */
   logError?: (err: unknown, message: string) => void;
@@ -24,7 +24,7 @@ export interface RunningServer {
 /** Fecha tudo o que foi criado; tenta cada recurso mesmo que o anterior falhe. */
 async function closeAll(
   app: FastifyInstance | undefined,
-  db: DatabaseCheck,
+  db: Database,
 ): Promise<void> {
   const errors: unknown[] = [];
   try {
@@ -50,13 +50,19 @@ export async function startServer(
   const logError =
     deps.logError ??
     ((err, msg) => console.error(formatErrorForLog(err, msg, secrets)));
-  const db = (deps.createDatabase ?? createDatabaseCheck)(env.DATABASE_URL);
+  const db = (deps.createDatabase ?? createDatabase)(env.DATABASE_URL);
   let app: FastifyInstance | undefined;
 
   try {
     app = (deps.buildApp ?? defaultBuildApp)({
       logger: buildLoggerOptions(env),
       checkDatabase: db.check,
+      trustProxy: env.TRUST_PROXY,
+      auth: {
+        prisma: db.prisma,
+        allowedOrigins: env.ALLOWED_ORIGINS,
+        secureCookies: env.NODE_ENV === "production",
+      },
     });
     await app.listen({ host: env.HOST, port: env.PORT });
   } catch (err) {
