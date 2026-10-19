@@ -9,6 +9,7 @@ import type { PrismaClient } from "./lib/db/client.ts";
 import type { Keyring } from "./lib/email/keyring.ts";
 import { authRoutes } from "./modules/auth/routes.ts";
 import { registerCsrfProtection } from "./plugins/csrf.ts";
+import { serviceRoutes } from "./modules/services/routes.ts";
 import { organizationRoutes } from "./modules/organizations/routes.ts";
 import { registerErrorHandling } from "./plugins/error-handler.ts";
 import { installRouteRegistry } from "./plugins/route-registry.ts";
@@ -67,6 +68,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     app.register(cookie);
     app.register(rateLimit, { global: false }); // limites aplicados por rota (createRateLimit)
     app.register(organizationRoutes, { prisma, secureCookies });
+    app.register(serviceRoutes, { prisma, secureCookies });
     app.register(authRoutes, {
       prisma,
       secureCookies,

@@ -7,6 +7,7 @@ import type { PrismaClient } from "./client.ts";
 /** Modelos com `organization_id` (escopados por tenant). Conferido contra o schema por teste (4.4, item 1). */
 export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
   "Membership",
+  "Service",
 ]);
 
 /** Modelos globais (sem `organization_id`), classificados explicitamente. Modelo novo não classificado falha o teste. */

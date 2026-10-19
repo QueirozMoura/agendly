@@ -103,7 +103,7 @@ describe("regras estáticas de src/", () => {
     ).toEqual([]);
   });
 
-  it("modelos escopados por empresa só são acessados diretamente nos módulos revisados; os novos usam forTenant()", () => {
+  it("modelos escopados por empresa: acesso direto só nos módulos revisados; os demais usam forTenant()", () => {
     const REVIEWED = [
       "lib/db/", // helper e infraestrutura
       "plugins/tenant.ts", // resolve a membership (user + empresa) a partir da sessão
@@ -114,12 +114,30 @@ describe("regras estáticas de src/", () => {
       const bad = offenders(
         (f) =>
           new RegExp(`\\.${accessor}\\.\\w+`).test(f.code) &&
-          !REVIEWED.some((r) => f.path.startsWith(r)),
+          !REVIEWED.some((r) => f.path.startsWith(r)) &&
+          // fora dos módulos revisados, o acesso só é aceito em arquivos que obtêm o cliente por forTenant()
+          !f.code.includes("forTenant("),
       );
       expect(
         bad,
-        `acesso direto a ${model} fora dos módulos revisados`,
+        `acesso direto a ${model} fora dos módulos revisados e sem forTenant()`,
       ).toEqual([]);
+    }
+  });
+
+  it("módulos de recursos escopados nunca recebem o PrismaClient sem escopo para consultar tabelas de tenant", () => {
+    // Arquivos que usam forTenant() não podem ALÉM DISSO acessar o modelo escopado direto pelo cliente base.
+    for (const model of TENANT_SCOPED_MODELS) {
+      const accessor = model[0]!.toLowerCase() + model.slice(1);
+      const bad = offenders(
+        (f) =>
+          f.code.includes("forTenant(") &&
+          !f.path.startsWith("lib/db/") &&
+          new RegExp(`\\bprisma\\.${accessor}\\.`).test(f.code),
+      );
+      expect(bad, `uso de prisma.${accessor}.* ao lado de forTenant()`).toEqual(
+        [],
+      );
     }
   });
 

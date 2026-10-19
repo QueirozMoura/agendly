@@ -355,7 +355,7 @@ EmailOutbox  (global; não pertence a uma empresa)
 | **EmailOutbox** | id, to_email, template, payload_encrypted (com key_id), status, dead_reason, attempts, next_attempt_at, locked_until, lock_token, not_after, last_error, created_at, sent_at | Seção 3.6. Entrega *at-least-once*. |
 | **Organization** | id, name, slug (único), **timezone (imutável)**, status (enum `OrganizationStatus`, valor inicial `{ ACTIVE }`, extensível por migrations futuras), **published_at?**, **public_min_notice_minutes (120)**, **public_max_advance_days (60)**, **public_max_active_bookings_per_phone (3)** | Valores entre parênteses são *configurações iniciais sujeitas à validação com usuários reais* (R6, 6.7). Editáveis só por `OWNER`. `slug` com lista de reservados. **Banco (Etapa 6):** `CHECK` de formato do slug (minúsculas/números/hífens, 3–40) e gatilho que recusa alterar `timezone`. |
 | **Membership** | id, user_id, organization_id, role | `role` aceita somente `OWNER` no MVP (mecanismo extensível a decidir no spike, V16); `UNIQUE(user_id, organization_id)`. Exatamente 1 `OWNER` por empresa criada (**índice único parcial** `memberships_one_owner_per_organization`, Etapa 6); **sem fluxo para adicionar ou remover membros no MVP** (evolução futura). |
-| **Service** | id, organization_id, name, duration_minutes, **buffer_minutes (default 0)**, price_cents?, active | Duração livre (inteiro ≥ 1), independente da grade de 15 min. |
+| **Service** | id, organization_id, name, duration_minutes, **buffer_minutes (default 0)**, price_cents?, active | Duração livre (inteiro ≥ 1), independente da grade de 15 min. **Banco (Etapa 7):** `CHECK`s de piso (`duration_minutes >= 1`, `buffer_minutes >= 0`, `price_cents` nulo ou `>= 0`) e `UNIQUE (organization_id, id)` (alvo das FKs compostas das etapas 8 e 10); não há `DELETE` (R-c): desativa-se com `active`. Tetos de sanidade só na API: duração e buffer ≤ 1440 min, preço ≤ R$ 1.000.000,00, nome ≤ 100 caracteres. |
 | **Professional** | id, organization_id, name, active | Sem `user_id` (D2). |
 | **ProfessionalService** | organization_id, professional_id, service_id | FKs compostas para ambos. |
 | **WorkingHours** | id, organization_id, professional_id, weekday (0–6), start_time, end_time | Hora **local** da empresa; vários intervalos por dia, sem sobreposição entre si; múltiplos de 15 min. |
@@ -750,7 +750,7 @@ Cada etapa é pequena, termina em um commit e só começa após a anterior estar
 - Aceite: itens 1–7 de 4.4 implementados e verdes; testes de `can()` (todas as ações permitidas ao `OWNER`, *default deny* para papel desconhecido); usuário sem membership ⇒ 404; criar empresa sem e-mail verificado ⇒ erro; `timezone` não pode ser alterado depois; divergência de `X-Active-Org` ⇒ 409; `organizationId` no body ⇒ 400; usuário `OWNER` de 2 empresas isolado corretamente. **Nenhum teste, seed ou código de `ADMIN`.**
 
 **Etapa 7 — Serviços**
-- Entrega: CRUD de `Service` com `duration_minutes` e `buffer_minutes` (padrão 0).
+- Entrega: CRUD de `Service` com `duration_minutes` e `buffer_minutes` (padrão 0). Rotas: `GET`/`POST /api/services` e `GET`/`PATCH /api/services/:id` (sem `DELETE`: ativar/desativar é um `PATCH` de `active`); ações `services.read`, `services.create` e `services.update`.
 - Aceite: validação de limites; A×B verde; somente o `OWNER` da empresa ativa opera; usuário de outra empresa ⇒ 404.
 
 **Etapa 8 — Profissionais e vínculo com serviços**

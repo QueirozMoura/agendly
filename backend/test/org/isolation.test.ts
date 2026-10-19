@@ -22,6 +22,10 @@ import { sentinelViolations } from "../support/sql-sentinel.ts";
 const TENANT_ROUTES_WITH_AB_TESTS = new Set([
   "GET /api/organization",
   "PATCH /api/organization",
+  "GET /api/services",
+  "POST /api/services",
+  "GET /api/services/:id",
+  "PATCH /api/services/:id",
 ]);
 
 let t: AuthTestApp;
@@ -72,9 +76,10 @@ describe("item 4 — registro de rotas × classificação", () => {
     expect(routes.filter((r) => r.access === "public")).toEqual([]);
   });
 
-  it("nenhuma rota tenant tem organizationId em path/parâmetro (a empresa vem da sessão)", () => {
+  it("nenhuma rota tenant tem organizationId no caminho; parâmetros de caminho só identificam recursos (a empresa vem da sessão)", () => {
     for (const r of t.app.routeRegistry.filter((x) => x.access === "tenant")) {
-      expect(r.url).not.toMatch(/:|organizationId|orgId/i);
+      expect(r.url).not.toMatch(/organization_?id|org_?id|:org|:tenant|:slug/i);
+      for (const param of r.url.match(/:\w+/g) ?? []) expect(param).toBe(":id");
     }
   });
 
@@ -233,6 +238,108 @@ describe("item 5 — suíte A×B de caixa-preta", () => {
       },
     ]);
     expect(violations).toEqual([]);
+  });
+});
+
+describe("item 5 — A×B para serviços", () => {
+  const svc = (
+    user: TestUser,
+    id: string,
+    body?: unknown,
+    method: "GET" | "PATCH" = "GET",
+    headers: Record<string, string> = {},
+  ) => api(t, method, `/api/services/${id}`, user, body, headers);
+
+  it("A não lê, lista, altera nem desativa o serviço de B; respostas iguais às de id inexistente", async () => {
+    const sb = (
+      await api(t, "POST", "/api/services", B, {
+        name: "Segredo do B",
+        durationMinutes: 20,
+      })
+    ).json().service;
+    const sa = (
+      await api(t, "POST", "/api/services", A, {
+        name: "Do A",
+        durationMinutes: 30,
+      })
+    ).json().service;
+    const rowB = await t.prisma.service.findUniqueOrThrow({
+      where: { id: sb.id },
+    });
+
+    const ghost = "00000000-0000-7000-8000-000000000999";
+    const [getB, getGhost, patchB, patchGhost] = await Promise.all([
+      svc(A, sb.id),
+      svc(A, ghost),
+      svc(A, sb.id, { name: "hackeado", active: false }, "PATCH"),
+      svc(A, ghost, { name: "hackeado", active: false }, "PATCH"),
+    ]);
+    for (const r of [getB, getGhost, patchB, patchGhost])
+      expect(r.statusCode).toBe(404);
+    expect({ ...getB.json().error, requestId: 0 }).toEqual({
+      ...getGhost.json().error,
+      requestId: 0,
+    });
+    expect({ ...patchB.json().error, requestId: 0 }).toEqual({
+      ...patchGhost.json().error,
+      requestId: 0,
+    });
+
+    const listA = (await api(t, "GET", "/api/services", A)).json();
+    expect(listA.services.map((s: { id: string }) => s.id)).toEqual([sa.id]);
+    expect(JSON.stringify(listA)).not.toContain("Segredo do B");
+
+    // ids, empresa e cabeçalhos manipulados
+    const orgB = await snapshotB();
+    const attacks = [
+      api(t, "POST", "/api/services", A, {
+        name: "x",
+        durationMinutes: 10,
+        organizationId: orgB.id,
+      }), // 400
+      api(t, "GET", `/api/services?organizationId=${orgB.id}`, A), // 400
+      api(
+        t,
+        "POST",
+        "/api/services",
+        A,
+        { name: "x", durationMinutes: 10 },
+        { "x-active-org": ORG_B_SLUG },
+      ), // 409
+      svc(A, sb.id, { name: "x" }, "PATCH", { "x-active-org": ORG_B_SLUG }), // 409
+      svc(A, sb.id, { organizationId: orgB.id }, "PATCH"), // 400
+    ];
+    const codes = (await Promise.all(attacks)).map((r) => r.statusCode);
+    expect(codes).toEqual([400, 400, 409, 409, 400]);
+
+    expect(
+      await t.prisma.service.findUniqueOrThrow({ where: { id: sb.id } }),
+    ).toEqual(rowB); // B intacto
+    expect(
+      await t.prisma.service.count({ where: { organizationId: orgB.id } }),
+    ).toBe(1);
+    expect(await t.prisma.service.count()).toBe(2); // nada foi criado por engano em nenhuma empresa
+  });
+
+  it("sentinela de SQL: toda consulta à tabela services cita organization_id", async () => {
+    const mine = (
+      await api(t, "POST", "/api/services", A, {
+        name: "Do A",
+        durationMinutes: 30,
+      })
+    ).json().service;
+    t.queries.length = 0;
+    await api(t, "GET", "/api/services", A);
+    await api(t, "GET", `/api/services/${mine.id}`, A);
+    await api(t, "PATCH", `/api/services/${mine.id}`, A, { name: "novo" });
+    await api(t, "POST", "/api/services", A, {
+      name: "outro",
+      durationMinutes: 15,
+    });
+    await api(t, "GET", `/api/services/${mine.id}`, B); // alheio
+    await api(t, "PATCH", `/api/services/${mine.id}`, B, { name: "x" }); // alheio
+    expect(t.queries.some((q) => /"services"/.test(q))).toBe(true);
+    expect(sentinelViolations(t.queries, [])).toEqual([]);
   });
 });
 

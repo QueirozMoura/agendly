@@ -56,6 +56,7 @@ model Organization {
 
   memberships Membership[]
   sessions    Session[]
+  services    Service[]
 
   @@map("organizations")
 }
@@ -160,4 +161,28 @@ model EmailOutbox {
   @@index([status, nextAttemptAt])
   @@index([status, lockedUntil])
   @@map("email_outbox")
+}
+
+// --- Etapa 7: serviços (seção 5). Escopado por empresa; pai de FKs compostas das etapas 8 e 10. ---
+
+model Service {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  name            String
+  // Duração livre (inteiro >= 1), independente da grade de 15 min. CHECKs de piso no SQL manual da migration.
+  durationMinutes Int      @map("duration_minutes")
+  // Tempo de preparação DEPOIS do atendimento (6.3); padrão 0.
+  bufferMinutes   Int      @default(0) @map("buffer_minutes")
+  priceCents      Int?     @map("price_cents")
+  // Serviços não são apagados (R-c): desativam-se.
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  // Alvo das FKs compostas (organization_id, service_id) de professional_services e appointments.
+  @@unique([organizationId, id])
+  @@index([organizationId, active, name])
+  @@map("services")
 }
