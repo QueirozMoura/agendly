@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parseSchemaModels } from "../support/schema-model.ts";
 import { TENANT_SCOPED_MODELS } from "../../src/lib/db/tenant.ts";
 
 const SRC = fileURLToPath(new URL("../../src", import.meta.url));
@@ -83,7 +84,9 @@ describe("regras estáticas de src/", () => {
 
   it("SQL em tabela escopada por empresa, se um dia existir em raw SQL, precisa citar organization_id", () => {
     // Nenhum raw SQL toca hoje uma tabela escopada; este teste falha se alguém adicionar um sem organization_id.
-    const tenantTables = ["memberships"];
+    const tenantTables = parseSchemaModels()
+      .filter((m) => m.hasOrganizationId)
+      .map((m) => m.dbName);
     const bad = offenders(
       (f) =>
         /\$(queryRaw|executeRaw)\b/.test(f.code) &&

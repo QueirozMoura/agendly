@@ -15,3 +15,20 @@ export async function lockOrganization(
 ): Promise<void> {
   await tx.$queryRaw`SELECT id FROM organizations WHERE id = ${organizationId}::uuid FOR NO KEY UPDATE`;
 }
+
+/**
+ * N2 (6.5): trava a linha de UM profissional da empresa dada (`FOR NO KEY UPDATE`). Devolve false se o profissional
+ * não existe NESSA empresa (inexistente e alheio são indistinguíveis). Serializa mudanças de vínculo/estado do
+ * profissional. A hierarquia completa (várias travas ordenadas, guard de ordem, `lock_timeout`) é da Etapa 9.
+ */
+export async function lockProfessional(
+  tx: Pick<TxClient, "$queryRaw">,
+  organizationId: string,
+  professionalId: string,
+): Promise<boolean> {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM professionals
+     WHERE organization_id = ${organizationId}::uuid AND id = ${professionalId}::uuid
+       FOR NO KEY UPDATE`;
+  return rows.length === 1;
+}

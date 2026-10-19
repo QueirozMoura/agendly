@@ -8,6 +8,8 @@ import type { PrismaClient } from "./client.ts";
 export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
   "Membership",
   "Service",
+  "Professional",
+  "ProfessionalService",
 ]);
 
 /** Modelos globais (sem `organization_id`), classificados explicitamente. Modelo novo não classificado falha o teste. */

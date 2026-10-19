@@ -54,9 +54,10 @@ model Organization {
   createdAt                       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  memberships Membership[]
-  sessions    Session[]
-  services    Service[]
+  memberships   Membership[]
+  sessions      Session[]
+  services      Service[]
+  professionals Professional[]
 
   @@map("organizations")
 }
@@ -179,10 +180,47 @@ model Service {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  professionals ProfessionalService[]
 
   // Alvo das FKs compostas (organization_id, service_id) de professional_services e appointments.
   @@unique([organizationId, id])
   @@index([organizationId, active, name])
   @@map("services")
+}
+
+// --- Etapa 8: profissionais (sem login, D2) e vínculo com serviços (seção 5) ---
+
+model Professional {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  // Profissionais não são apagados (R-c): desativam-se. Não há `user_id` (D2).
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  services     ProfessionalService[]
+
+  // Alvo das FKs compostas (organization_id, professional_id) de professional_services e das etapas 9 e 10.
+  @@unique([organizationId, id])
+  @@index([organizationId, active, name])
+  @@map("professionals")
+}
+
+// Vínculo N:N. As duas FKs são COMPOSTAS com organization_id: o banco impede vincular um profissional a um
+// serviço de outra empresa (RESTRICT em delete e update; nunca SET NULL).
+model ProfessionalService {
+  organizationId String   @map("organization_id") @db.Uuid
+  professionalId String   @map("professional_id") @db.Uuid
+  serviceId      String   @map("service_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  professional Professional @relation(fields: [organizationId, professionalId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  service      Service      @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([professionalId, serviceId])
+  @@index([organizationId, serviceId])
+  @@map("professional_services")
 }

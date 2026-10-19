@@ -26,6 +26,11 @@ const TENANT_ROUTES_WITH_AB_TESTS = new Set([
   "POST /api/services",
   "GET /api/services/:id",
   "PATCH /api/services/:id",
+  "GET /api/professionals",
+  "POST /api/professionals",
+  "GET /api/professionals/:id",
+  "PATCH /api/professionals/:id",
+  "PUT /api/professionals/:id/services",
 ]);
 
 let t: AuthTestApp;
@@ -343,6 +348,153 @@ describe("item 5 — A×B para serviços", () => {
   });
 });
 
+describe("item 5 — A×B para profissionais e vínculos", () => {
+  const pro = (user: TestUser, name: string) =>
+    api(t, "POST", "/api/professionals", user, { name }).then(
+      (r) => r.json().professional as { id: string },
+    );
+  const svc = (user: TestUser, name: string) =>
+    api(t, "POST", "/api/services", user, { name, durationMinutes: 30 }).then(
+      (r) => r.json().service as { id: string },
+    );
+  const setLinks = (
+    user: TestUser,
+    professionalId: string,
+    serviceIds: string[],
+    headers: Record<string, string> = {},
+  ) =>
+    api(
+      t,
+      "PUT",
+      `/api/professionals/${professionalId}/services`,
+      user,
+      { serviceIds },
+      headers,
+    );
+
+  it("A não lê, altera, desativa nem vincula nada de B; respostas iguais às de id inexistente", async () => {
+    const pa = await pro(A, "Profissional A");
+    const pb = await pro(B, "Profissional B");
+    const sa = await svc(A, "Serviço A");
+    const sb = await svc(B, "Serviço B");
+    await setLinks(B, pb.id, [sb.id]);
+    const ghost = "00000000-0000-7000-8000-000000000999";
+    const orgB = await snapshotB();
+    const linksBefore = await t.prisma.professionalService.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+    const rowB = await t.prisma.professional.findUniqueOrThrow({
+      where: { id: pb.id },
+    });
+
+    const [getB, getGhost, patchB, patchGhost] = await Promise.all([
+      api(t, "GET", `/api/professionals/${pb.id}`, A),
+      api(t, "GET", `/api/professionals/${ghost}`, A),
+      api(t, "PATCH", `/api/professionals/${pb.id}`, A, {
+        name: "hackeado",
+        active: false,
+      }),
+      api(t, "PATCH", `/api/professionals/${ghost}`, A, {
+        name: "hackeado",
+        active: false,
+      }),
+    ]);
+    for (const r of [getB, getGhost, patchB, patchGhost])
+      expect(r.statusCode).toBe(404);
+    expect({ ...getB.json().error, requestId: 0 }).toEqual({
+      ...getGhost.json().error,
+      requestId: 0,
+    });
+    expect({ ...patchB.json().error, requestId: 0 }).toEqual({
+      ...patchGhost.json().error,
+      requestId: 0,
+    });
+
+    // vincular: profissional de B, serviço de B, e mistura — tudo 404, igual a inexistente, e nada muda
+    const attempts = await Promise.all([
+      setLinks(A, pb.id, [sa.id]), // profissional alheio
+      setLinks(A, pa.id, [sb.id]), // serviço alheio
+      setLinks(A, pa.id, [sa.id, sb.id]), // um próprio e um alheio: nada é aplicado
+      setLinks(A, pa.id, [ghost]), // inexistente
+      setLinks(A, ghost, [sa.id]), // profissional inexistente
+    ]);
+    for (const r of attempts) expect(r.statusCode).toBe(404);
+    const norm = (r: (typeof attempts)[number]) => ({
+      ...r.json().error,
+      requestId: 0,
+    });
+    for (const r of attempts) expect(norm(r)).toEqual(norm(attempts[3]!));
+    expect(
+      await t.prisma.professionalService.count({
+        where: { professionalId: pa.id },
+      }),
+    ).toBe(0);
+
+    // corpo/cabeçalho/consulta manipulados
+    const codes = (
+      await Promise.all([
+        api(t, "POST", "/api/professionals", A, {
+          name: "x",
+          organizationId: orgB.id,
+        }),
+        api(t, "GET", `/api/professionals?organizationId=${orgB.id}`, A),
+        api(
+          t,
+          "POST",
+          "/api/professionals",
+          A,
+          { name: "x" },
+          { "x-active-org": ORG_B_SLUG },
+        ),
+        api(
+          t,
+          "PATCH",
+          `/api/professionals/${pb.id}`,
+          A,
+          { name: "x" },
+          { "x-active-org": ORG_B_SLUG },
+        ),
+        api(t, "PUT", `/api/professionals/${pa.id}/services`, A, {
+          serviceIds: [sa.id],
+          organizationId: orgB.id,
+        }),
+      ])
+    ).map((r) => r.statusCode);
+    expect(codes).toEqual([400, 400, 409, 409, 400]);
+
+    const list = (await api(t, "GET", "/api/professionals", A)).json();
+    expect(list.professionals.map((p: { id: string }) => p.id)).toEqual([
+      pa.id,
+    ]);
+    expect(JSON.stringify(list)).not.toContain(sb.id);
+    expect(
+      await t.prisma.professional.findUniqueOrThrow({ where: { id: pb.id } }),
+    ).toEqual(rowB);
+    expect(
+      await t.prisma.professionalService.findMany({
+        orderBy: { createdAt: "asc" },
+      }),
+    ).toEqual(linksBefore);
+    expect(await t.prisma.professional.count()).toBe(2);
+  });
+
+  it("sentinela de SQL: consultas a professionals e professional_services citam organization_id", async () => {
+    const pa = await pro(A, "Profissional A");
+    const sa = await svc(A, "Serviço A");
+    t.queries.length = 0;
+    await api(t, "GET", "/api/professionals", A);
+    await api(t, "GET", `/api/professionals/${pa.id}`, A);
+    await api(t, "PATCH", `/api/professionals/${pa.id}`, A, { name: "novo" });
+    await setLinks(A, pa.id, [sa.id]);
+    await setLinks(A, pa.id, []);
+    await api(t, "GET", `/api/professionals/${pa.id}`, B); // alheio
+    await setLinks(B, pa.id, [sa.id]); // alheio
+    expect(t.queries.some((q) => /"professional_services"/.test(q))).toBe(true);
+    expect(t.queries.some((q) => /FROM professionals/.test(q))).toBe(true); // a trava (SQL cru) também é vista
+    expect(sentinelViolations(t.queries, [])).toEqual([]);
+  });
+});
+
 describe("os detectores realmente detectam (testes dos testes)", () => {
   it("o registro de rotas enxerga rota sem classificação e rota tenant sem ação", async () => {
     const { buildApp } = await import("../../src/app.ts");
@@ -411,10 +563,13 @@ describe("item 7 — FKs compostas entre tabelas escopadas", () => {
     expect(fks.filter((f) => !f.has_org)).toEqual([]);
   });
 
-  it("schema de produção: hoje não há FK entre duas tabelas escopadas (a regra vale quando existirem)", async () => {
+  it("schema de produção: as FKs entre tabelas escopadas (vínculo profissional×serviço) são todas compostas", async () => {
     const fks = await nonCompositeTenantFks(TEST_DB);
     expect(fks.filter((f) => !f.has_org)).toEqual([]);
-    expect(fks).toEqual([]); // memberships → organizations é simples por construção (organizations é a raiz do tenant)
+    expect(fks.map((f) => `${f.source}->${f.target}`).sort()).toEqual([
+      "professional_services->professionals",
+      "professional_services->services",
+    ]);
   });
 
   it("par inconsistente via SQL cru falha por FK composta — evidência do spike da Etapa 3 (v3-composite-fk.test.ts)", async () => {
