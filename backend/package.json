@@ -4,7 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "node --env-file-if-exists=../.env src/server.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "fastify": "5.12.7",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
   }
 }
