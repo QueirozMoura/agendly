@@ -1,6 +1,6 @@
 import type { PrismaClient } from "../../lib/db/client.ts";
 import { classifyDbError } from "../../lib/db/errors.ts";
-import { lockOrganization } from "../../lib/db/locks/index.ts";
+import { lockOrganization, runLocked } from "../../lib/db/locks/index.ts";
 import { AppError } from "../../lib/errors.ts";
 import { newId } from "../../lib/ids.ts";
 import type { UpdateOrganizationInput } from "./schemas.ts";
@@ -126,7 +126,7 @@ export async function updateOrganization(
   patch: UpdateOrganizationInput,
 ): Promise<OrganizationView> {
   try {
-    return await deps.prisma.$transaction(async (tx) => {
+    return await runLocked(deps.prisma, async (tx) => {
       await lockOrganization(tx, tenant.organizationId);
       const current = await tx.organization.findUnique({
         where: { id: tenant.organizationId },

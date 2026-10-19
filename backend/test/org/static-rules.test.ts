@@ -66,7 +66,9 @@ describe("regras estáticas de src/", () => {
   const RAW_SQL_ALLOWLIST: Record<string, string> = {
     "lib/db/database.ts": "SELECT 1 (readiness); sem tabelas",
     "lib/db/locks/index.ts":
-      "trava users (domínio de autenticação, global) e a linha de organizations pelo próprio id",
+      "trava users (domínio de autenticação, global), a linha de organizations pelo próprio id e professionals SEMPRE filtrada por organization_id",
+    "lib/db/locks/transaction.ts":
+      "set_config('lock_timeout') da transação corrente; sem tabelas",
     "lib/db/locks/outbox.ts":
       "email_outbox é global (não pertence a uma empresa)",
     "lib/db/locks/maintenance.ts":

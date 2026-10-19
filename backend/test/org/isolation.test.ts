@@ -31,6 +31,14 @@ const TENANT_ROUTES_WITH_AB_TESTS = new Set([
   "GET /api/professionals/:id",
   "PATCH /api/professionals/:id",
   "PUT /api/professionals/:id/services",
+  "GET /api/working-hours",
+  "POST /api/working-hours",
+  "PATCH /api/working-hours/:id",
+  "DELETE /api/working-hours/:id",
+  "GET /api/time-off",
+  "POST /api/time-off",
+  "PATCH /api/time-off/:id",
+  "DELETE /api/time-off/:id",
 ]);
 
 let t: AuthTestApp;
@@ -495,6 +503,198 @@ describe("item 5 — A×B para profissionais e vínculos", () => {
   });
 });
 
+describe("item 5 — A×B para WorkingHours e TimeOff", () => {
+  const pro = (user: TestUser, name: string) =>
+    api(t, "POST", "/api/professionals", user, { name }).then(
+      (r) => r.json().professional.id as string,
+    );
+  const addWh = (user: TestUser, professionalId: string) =>
+    api(t, "POST", "/api/working-hours", user, {
+      professionalId,
+      weekday: 1,
+      startTime: "09:00",
+      endTime: "12:00",
+    }).then((r) => r.json().workingHours.id as string);
+  const addTo = (user: TestUser, professionalId: string) =>
+    api(t, "POST", "/api/time-off", user, {
+      professionalId,
+      startsAt: "2031-07-01T10:00:00Z",
+      endsAt: "2031-07-01T12:00:00Z",
+    }).then((r) => r.json().timeOff.id as string);
+  const norm = (r: { statusCode: number; json: () => { error: object } }) => ({
+    status: r.statusCode,
+    error: { ...r.json().error, requestId: 0 },
+  });
+  const GHOST = "00000000-0000-7000-8000-000000000999";
+
+  it("A não lê, cria, altera nem remove nada de B; respostas iguais às de id inexistente; B intacto", async () => {
+    const pa = await pro(A, "Profissional A");
+    const pb = await pro(B, "Profissional B");
+    const whB = await addWh(B, pb);
+    const toB = await addTo(B, pb);
+    const whA = await addWh(A, pa);
+    const rowsB = async () => ({
+      wh: await t.prisma.workingHours.findMany({
+        where: { professionalId: pb },
+      }),
+      to: await t.prisma.timeOff.findMany({ where: { professionalId: pb } }),
+    });
+    const before = await rowsB();
+    const total = {
+      wh: await t.prisma.workingHours.count(),
+      to: await t.prisma.timeOff.count(),
+    };
+
+    const attack = (idB: string, proB: string) =>
+      Promise.all([
+        api(t, "GET", `/api/working-hours?professionalId=${proB}`, A),
+        api(t, "GET", `/api/time-off?professionalId=${proB}`, A),
+        api(t, "POST", "/api/working-hours", A, {
+          professionalId: proB,
+          weekday: 2,
+          startTime: "09:00",
+          endTime: "10:00",
+        }),
+        api(t, "POST", "/api/time-off", A, {
+          professionalId: proB,
+          startsAt: "2031-08-01T10:00:00Z",
+          endsAt: "2031-08-01T11:00:00Z",
+        }),
+        api(t, "PATCH", `/api/working-hours/${idB}`, A, { endTime: "23:00" }),
+        api(t, "DELETE", `/api/working-hours/${idB}`, A),
+        api(t, "PATCH", `/api/time-off/${idB}`, A, { reason: "hackeado" }),
+        api(t, "DELETE", `/api/time-off/${idB}`, A),
+      ]);
+    const real = await Promise.all([attack(whB, pb), attack(toB, pb)]);
+    const ghost = await Promise.all([
+      attack(GHOST, GHOST),
+      attack(GHOST, GHOST),
+    ]);
+    // os 4 ataques por id: o id de B vale para a rota certa (working-hours ou time-off); a outra rota recebe um id
+    // desconhecido para ela — de todo modo, sempre 404 idêntico ao de id inexistente
+    for (const results of [...real, ...ghost])
+      for (const r of results) expect(r.statusCode).toBe(404);
+    for (let i = 0; i < 8; i++) {
+      expect(norm(real[0]![i]!), `ataque ${i} (working-hours)`).toEqual(
+        norm(ghost[0]![i]!),
+      );
+      expect(norm(real[1]![i]!), `ataque ${i} (time-off)`).toEqual(
+        norm(ghost[1]![i]!),
+      );
+    }
+    expect(await rowsB()).toEqual(before);
+    expect(await t.prisma.workingHours.count()).toBe(total.wh);
+    expect(await t.prisma.timeOff.count()).toBe(total.to);
+    // A continua enxergando e operando o que é seu
+    expect(
+      (
+        await api(t, "PATCH", `/api/working-hours/${whA}`, A, {
+          endTime: "13:00",
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        (
+          await api(t, "GET", `/api/working-hours?professionalId=${pa}`, A)
+        ).json().workingHours as unknown[]
+      ).length,
+    ).toBe(1);
+  });
+
+  it("organizationId no corpo/na query => 400; X-Active-Org de B => 409; nada muda em B", async () => {
+    const pa = await pro(A, "Profissional A");
+    const orgB = await snapshotB();
+    const before = {
+      wh: await t.prisma.workingHours.count(),
+      to: await t.prisma.timeOff.count(),
+    };
+    const whId = await addWh(A, pa);
+    const toId = await addTo(A, pa);
+    const responses = await Promise.all([
+      api(
+        t,
+        "GET",
+        `/api/working-hours?professionalId=${pa}&organizationId=${orgB.id}`,
+        A,
+      ),
+      api(
+        t,
+        "GET",
+        `/api/time-off?professionalId=${pa}&organizationId=${orgB.id}`,
+        A,
+      ),
+      api(t, "POST", "/api/working-hours", A, {
+        professionalId: pa,
+        weekday: 3,
+        startTime: "09:00",
+        endTime: "10:00",
+        organizationId: orgB.id,
+      }),
+      api(t, "POST", "/api/time-off", A, {
+        professionalId: pa,
+        startsAt: "2031-08-01T10:00:00Z",
+        endsAt: "2031-08-01T11:00:00Z",
+        organizationId: orgB.id,
+      }),
+      api(t, "PATCH", `/api/working-hours/${whId}`, A, {
+        organizationId: orgB.id,
+      }),
+      api(t, "PATCH", `/api/time-off/${toId}`, A, { organizationId: orgB.id }),
+    ]);
+    for (const r of responses) expect(r.statusCode).toBe(400);
+    const switched = await Promise.all([
+      api(t, "GET", `/api/working-hours?professionalId=${pa}`, A, undefined, {
+        "x-active-org": ORG_B_SLUG,
+      }),
+      api(
+        t,
+        "POST",
+        "/api/working-hours",
+        A,
+        {
+          professionalId: pa,
+          weekday: 3,
+          startTime: "09:00",
+          endTime: "10:00",
+        },
+        { "x-active-org": ORG_B_SLUG },
+      ),
+      api(
+        t,
+        "DELETE",
+        `/api/time-off/${toId}`,
+        A,
+        {},
+        { "x-active-org": ORG_B_SLUG },
+      ),
+    ]);
+    for (const r of switched) expect(r.statusCode).toBe(409);
+    expect(await t.prisma.workingHours.count()).toBe(before.wh + 1);
+    expect(await t.prisma.timeOff.count()).toBe(before.to + 1);
+    expect(
+      await t.prisma.workingHours.count({ where: { organizationId: orgB.id } }),
+    ).toBe(0);
+  });
+
+  it("sentinela de SQL: consultas a working_hours e time_off citam organization_id", async () => {
+    const pa = await pro(A, "Profissional A");
+    t.queries.length = 0;
+    const w = await addWh(A, pa);
+    const o = await addTo(A, pa);
+    await api(t, "GET", `/api/working-hours?professionalId=${pa}`, A);
+    await api(t, "GET", `/api/time-off?professionalId=${pa}`, A);
+    await api(t, "PATCH", `/api/working-hours/${w}`, A, { endTime: "13:00" });
+    await api(t, "PATCH", `/api/time-off/${o}`, A, { reason: "x" });
+    await api(t, "DELETE", `/api/working-hours/${w}`, B); // alheio
+    await api(t, "DELETE", `/api/time-off/${o}`, A);
+    await api(t, "DELETE", `/api/working-hours/${w}`, A);
+    expect(t.queries.some((q) => /"working_hours"/.test(q))).toBe(true);
+    expect(t.queries.some((q) => /"time_off"/.test(q))).toBe(true);
+    expect(sentinelViolations(t.queries, [])).toEqual([]);
+  });
+});
+
 describe("os detectores realmente detectam (testes dos testes)", () => {
   it("o registro de rotas enxerga rota sem classificação e rota tenant sem ação", async () => {
     const { buildApp } = await import("../../src/app.ts");
@@ -569,6 +769,8 @@ describe("item 7 — FKs compostas entre tabelas escopadas", () => {
     expect(fks.map((f) => `${f.source}->${f.target}`).sort()).toEqual([
       "professional_services->professionals",
       "professional_services->services",
+      "time_off->professionals",
+      "working_hours->professionals",
     ]);
   });
 

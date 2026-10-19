@@ -1,5 +1,9 @@
 import type { PrismaClient, TxClient } from "../../lib/db/client.ts";
-import { lockProfessional } from "../../lib/db/locks/index.ts";
+import {
+  enterLeafWrite,
+  lockProfessionals,
+  runLocked,
+} from "../../lib/db/locks/index.ts";
 import { forTenant } from "../../lib/db/tenant.ts";
 import { AppError } from "../../lib/errors.ts";
 
@@ -111,15 +115,16 @@ export async function updateProfessional(
   const data = Object.fromEntries(
     Object.entries(patch).filter(([, v]) => v !== undefined),
   );
-  await forTenant(prisma, scope.organizationId).$transaction(async (tx) => {
+  await runLocked(forTenant(prisma, scope.organizationId), async (tx) => {
     if (
-      !(await lockProfessional(
+      !(await lockProfessionals(
         tx as unknown as TxClient,
         scope.organizationId,
-        id,
+        [id],
       ))
     )
       throw notFound();
+    enterLeafWrite(tx, id);
     await tx.professional.update({ where: { id }, data });
   });
   return getProfessional(prisma, scope, id);
@@ -139,12 +144,12 @@ export async function setProfessionalServices(
   serviceIds: string[],
 ): Promise<ProfessionalView> {
   const wanted = [...new Set(serviceIds)];
-  await forTenant(prisma, scope.organizationId).$transaction(async (tx) => {
+  await runLocked(forTenant(prisma, scope.organizationId), async (tx) => {
     if (
-      !(await lockProfessional(
+      !(await lockProfessionals(
         tx as unknown as TxClient,
         scope.organizationId,
-        id,
+        [id],
       ))
     )
       throw notFound();
@@ -156,6 +161,7 @@ export async function setProfessionalServices(
       });
       if (found.length !== wanted.length) throw notFound(); // serviço alheio ou inexistente
     }
+    enterLeafWrite(tx, id);
     await tx.professionalService.deleteMany({
       where: {
         professionalId: id,

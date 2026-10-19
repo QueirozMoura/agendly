@@ -51,3 +51,44 @@ export function canonicalTimeZone(input: string): string | undefined {
   return new Intl.DateTimeFormat("en-US", { timeZone: input }).resolvedOptions()
     .timeZone;
 }
+
+const MS_PER_MINUTE = 60_000;
+
+/** Dia local "YYYY-MM-DD" válido no calendário? */
+export function isValidLocalDate(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const d = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(date);
+}
+
+/** Dia da semana (0 = domingo ... 6 = sábado) de um dia local "YYYY-MM-DD" (o calendário não depende do fuso). */
+export function localWeekday(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
+/**
+ * Instante UTC do minuto `minute` (0–1440; 1440 = meia-noite seguinte) do dia local `date` na `timeZone`.
+ * Diferente de `zonedLocalToUtc`, tolera a lacuna do horário de verão: se o horário local não existe, usa o primeiro
+ * horário existente depois dele (em passos de 15 min, até 4 h). Horário ambíguo => primeira ocorrência.
+ */
+export function localMinuteToUtc(
+  date: string,
+  minute: number,
+  timeZone: string,
+): Date {
+  if (!isValidTimeZone(timeZone))
+    throw new TimeZoneError(`Fuso inválido: ${timeZone}`);
+  const base = new Date(`${date}T00:00:00Z`).getTime();
+  for (let shift = 0; shift <= 16; shift++) {
+    // A hora de relógio é escrita como se fosse UTC apenas para formatar "yyyy-MM-ddTHH:mm:ss".
+    const wall = new Date(base + (minute + shift * 15) * MS_PER_MINUTE)
+      .toISOString()
+      .slice(0, 19);
+    try {
+      return zonedLocalToUtc(wall, timeZone);
+    } catch (err) {
+      if (!(err instanceof TimeZoneError)) throw err;
+    }
+  }
+  throw new TimeZoneError(`Horário local sem instante: ${date} +${minute} min`);
+}

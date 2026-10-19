@@ -13,6 +13,8 @@ const OWNER_ACTIONS = [
   "services.toggle",
   "professionals.create",
   "professionals.link_service",
+  "availability.read",
+  "availability.write",
   "availability.working_hours.update",
   "availability.time_off.create",
   "customers.read",

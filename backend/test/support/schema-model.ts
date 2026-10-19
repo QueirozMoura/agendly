@@ -31,3 +31,23 @@ export function parseSchemaModels(
   }
   return models;
 }
+
+/**
+ * Modelos-PAI: alvo de alguma relação com chaves estrangeiras (`@relation(fields: [...])`) declarada em outro modelo.
+ * Apagar uma linha-pai conflita com as checagens de FK dos filhos e criaria esperas fora da hierarquia de locks
+ * (R-c, 6.5); por isso nenhum código de produção pode dar `delete`/`deleteMany` neles.
+ */
+export function parentModels(
+  path = new URL("../../prisma/schema.prisma", import.meta.url),
+): string[] {
+  const text = readFileSync(path, "utf8");
+  const parents = new Set<string>();
+  for (const m of text.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)) {
+    const [, name, body] = m as unknown as [string, string, string];
+    for (const line of body.split("\n")) {
+      const rel = /^\s*\w+\s+(\w+)\??\s+@relation\(.*fields:\s*\[/.exec(line);
+      if (rel && rel[1] !== name) parents.add(rel[1] as string);
+    }
+  }
+  return [...parents].sort();
+}

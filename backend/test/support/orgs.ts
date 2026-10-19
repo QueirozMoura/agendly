@@ -54,7 +54,7 @@ type Headers = Record<string, string>;
 
 export function api(
   t: AuthTestApp,
-  method: "GET" | "POST" | "PATCH" | "PUT",
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
   url: string,
   user: { cookie: string } | undefined,
   body?: unknown,

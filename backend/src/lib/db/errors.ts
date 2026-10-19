@@ -9,7 +9,8 @@ export type DbErrorKind =
   | "check_violation" // 23514
   | "deadlock" // 40P01
   | "serialization_failure" // 40001
-  | "lock_timeout"; // 55P03
+  | "lock_timeout" // 55P03
+  | "transaction_timeout"; // P2028 de EXPIRAÇÃO ou de espera por conexão (não os demais P2028)
 
 const BY_SQLSTATE: Record<string, DbErrorKind> = {
   "23505": "unique_violation",
@@ -47,9 +48,33 @@ const BY_PRISMA_CODE: Record<string, DbErrorKind> = {
   P2003: "foreign_key_violation",
 };
 
+/**
+ * P2028 é uma família de erros de transação interativa. Só duas formas são "tente de novo" (a transação sofreu rollback e
+ * nada foi gravado), verificadas na versão instalada (Prisma 7.10.1, ver STAGE-9-VALIDATIONS.md):
+ * - expirou: `meta` traz `timeout` e `timeTaken` numéricos ("A query/commit cannot be executed on an expired transaction");
+ * - não obteve conexão em `maxWait`: "Unable to start a transaction in the given time." (`meta` vazio).
+ * As demais ("Transaction already closed", "Transaction not found", "Internal Consistency Error") indicam falha de
+ * programação ou do motor e continuam sendo erro interno.
+ */
+function isTransactionTimeout(err: unknown): boolean {
+  if (!isRecord(err) || err.code !== "P2028") return false;
+  const meta = err.meta;
+  if (
+    isRecord(meta) &&
+    typeof meta.timeout === "number" &&
+    typeof meta.timeTaken === "number"
+  )
+    return true;
+  return (
+    typeof err.message === "string" &&
+    err.message.includes("Unable to start a transaction in the given time")
+  );
+}
+
 export function classifyDbError(err: unknown): DbErrorKind | undefined {
   const state = sqlState(err);
   if (state && BY_SQLSTATE[state]) return BY_SQLSTATE[state];
+  if (isTransactionTimeout(err)) return "transaction_timeout";
   return isRecord(err) && typeof err.code === "string"
     ? BY_PRISMA_CODE[err.code]
     : undefined;

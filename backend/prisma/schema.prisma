@@ -202,8 +202,10 @@ model Professional {
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   services     ProfessionalService[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
 
-  // Alvo das FKs compostas (organization_id, professional_id) de professional_services e das etapas 9 e 10.
+  // Alvo das FKs compostas (organization_id, professional_id) de professional_services, working_hours, time_off e da etapa 10.
   @@unique([organizationId, id])
   @@index([organizationId, active, name])
   @@map("professionals")
@@ -223,4 +225,41 @@ model ProfessionalService {
   @@id([professionalId, serviceId])
   @@index([organizationId, serviceId])
   @@map("professional_services")
+}
+
+// Expediente semanal em hora LOCAL da empresa (6.1). `weekday` 0 = domingo ... 6 = sábado. Os horários são MINUTOS desde
+// 00:00 local (0–1440; 1440 = meia-noite seguinte), múltiplos de 15: o `time` do Postgres chega ao Prisma como `Date` e não
+// representa 24:00. Vários intervalos por dia; a sobreposição no mesmo dia é barrada na aplicação (sob a trava N2) e, como
+// rede de segurança, por EXCLUDE na migration (SQL manual). CHECKs de faixa também na migration.
+model WorkingHours {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  professionalId String   @map("professional_id") @db.Uuid
+  weekday        Int      @db.SmallInt
+  startMinute    Int      @map("start_minute") @db.SmallInt
+  endMinute      Int      @map("end_minute") @db.SmallInt
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  professional Professional @relation(fields: [organizationId, professionalId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, professionalId, weekday, startMinute])
+  @@map("working_hours")
+}
+
+// Folga/ausência do profissional (instantes absolutos). `CHECK (ends_at > starts_at)` na migration.
+model TimeOff {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  professionalId String   @map("professional_id") @db.Uuid
+  startsAt       DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt         DateTime @map("ends_at") @db.Timestamptz(3)
+  reason         String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  professional Professional @relation(fields: [organizationId, professionalId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organizationId, professionalId, startsAt])
+  @@map("time_off")
 }

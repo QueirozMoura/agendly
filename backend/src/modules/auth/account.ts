@@ -1,7 +1,7 @@
 import { randomToken, sha256Hex } from "../../lib/crypto.ts";
 import type { PrismaClient, TxClient } from "../../lib/db/client.ts";
 import { classifyDbError } from "../../lib/db/errors.ts";
-import { lockUser } from "../../lib/db/locks/index.ts";
+import { lockUser, runLocked } from "../../lib/db/locks/index.ts";
 import { AppError } from "../../lib/errors.ts";
 import { enqueueEmail, type OutboxContext } from "../email/outbox.ts";
 
@@ -104,7 +104,7 @@ export async function resendVerification(
   userId: string,
 ): Promise<void> {
   const now = deps.outbox.clock.now();
-  await deps.prisma.$transaction(async (tx) => {
+  await runLocked(deps.prisma, async (tx) => {
     await lockUser(tx, userId); // A1
     const user = await tx.user.findUnique({
       where: { id: userId },
@@ -135,7 +135,7 @@ export async function verifyEmail(
   if (!found || found.type !== "EMAIL_VERIFICATION") throw tokenInvalid();
 
   const now = deps.outbox.clock.now();
-  await deps.prisma.$transaction(async (tx) => {
+  await runLocked(deps.prisma, async (tx) => {
     await lockUser(tx, found.userId); // A1
     const { count } = await tx.authToken.updateMany({
       where: {
@@ -165,7 +165,7 @@ export async function requestPasswordReset(
   });
   if (!user) return;
   const now = deps.outbox.clock.now();
-  await deps.prisma.$transaction(async (tx) => {
+  await runLocked(deps.prisma, async (tx) => {
     await lockUser(tx, user.id); // A1
     const token = await issueToken(tx, user.id, "PASSWORD_RESET", now); // A2 (invalida os pendentes)
     await enqueueEmail(tx, deps.outbox, {
@@ -194,7 +194,7 @@ export async function resetPassword(
   if (!found || found.type !== "PASSWORD_RESET") throw tokenInvalid();
 
   const now = deps.outbox.clock.now();
-  await deps.prisma.$transaction(async (tx) => {
+  await runLocked(deps.prisma, async (tx) => {
     await lockUser(tx, found.userId); // 1. A1: serializa com qualquer outra operação de credencial
     const { count } = await tx.authToken.updateMany({
       where: {
@@ -237,7 +237,7 @@ export async function logoutAllDevices(
   userId: string,
 ): Promise<void> {
   const now = deps.outbox.clock.now();
-  await deps.prisma.$transaction(async (tx) => {
+  await runLocked(deps.prisma, async (tx) => {
     await lockUser(tx, userId);
     await tx.session.updateMany({
       where: { userId, revokedAt: null },
