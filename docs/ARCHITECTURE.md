@@ -1,13 +1,13 @@
 # Agendly — Arquitetura proposta (revisão 4)
 
-> Status: **proposta corrigida, aguardando aprovação humana.** Nenhum código de aplicação existe ainda.
+> Status: **proposta corrigida, aguardando aprovação humana.** O código de aplicação (funcionalidades do produto: autenticação, empresas, serviços, agendamentos etc.) ainda não foi implementado. Já existem a infraestrutura das Etapas 1 a 3 (monorepo, backend base, fundação do banco com a migration de identidade) e os spikes técnicos da Etapa 3, todos testados contra PostgreSQL real; ver [`STAGE-3-VALIDATIONS.md`](./STAGE-3-VALIDATIONS.md).
 >
-> **Aviso geral:** todos os testes e critérios de aceite descritos neste documento são **especificações**. Nenhum teste foi escrito ou executado, e nenhuma compatibilidade técnica foi verificada.
+> **Aviso geral:** os testes e critérios de aceite descritos neste documento são **especificações**, salvo os já implementados e executados nas etapas concluídas (backend base e validações técnicas da Etapa 3). As validações V1–V8, V13, V15 e V16 foram concluídas na Etapa 3, com evidência em [`STAGE-3-VALIDATIONS.md`](./STAGE-3-VALIDATIONS.md). Os demais testes e critérios descritos aqui, e as validações pendentes (V9–V12 e V14), **continuam não escritos, não executados ou não verificados**.
 >
 > Como ler este documento (os tipos de afirmação ficam separados):
 > - **Decisões de produto aprovadas** — fixas; consolidadas na **seção 15** (D1–D14 da revisão 2, R1–R10 da revisão 3 e C1–C6 da revisão 4).
 > - **Proposta técnica** — o desenho deste documento, derivado das decisões aprovadas; só vira definitivo com a aprovação da arquitetura (etapa 0).
-> - **[VALIDAR]** — compatibilidade ou comportamento técnico **não comprovado**. Lista consolidada na **seção 13**, toda com estado "não verificado". Nada ali é decisão de produto e nada ali deve ser tratado como garantia antes do spike da etapa 3 ou da consulta à documentação oficial.
+> - **[VALIDAR]** — compatibilidade ou comportamento técnico que precisa de comprovação. Lista consolidada na **seção 13**. Os itens V1–V8, V13, V15 e V16 foram **resolvidos na Etapa 3** (evidência em [`STAGE-3-VALIDATIONS.md`](./STAGE-3-VALIDATIONS.md)), com ressalvas para V7 e V8 registradas na própria seção 13; os demais continuam "não verificado". Nada ali é decisão de produto e nada que siga "não verificado" deve ser tratado como garantia antes de teste ou consulta à documentação oficial.
 > - **[DECIDIR]** — pergunta que ainda precisa de resposta humana. A **seção 14** separa o que bloqueia a Etapa 1, o que se resolve na Etapa 3 e o que se resolve nas etapas seguintes.
 
 ## Sumário
@@ -307,9 +307,9 @@ Todas as linhas abaixo são **riscos a comprovar** num spike da etapa 3 com a ve
 
 | Tema | Limitação / risco | Postura |
 |---|---|---|
-| **FK composta** `(organization_id, X_id) → X(organization_id, id)` | Exige `@@unique([organizationId, id])` no pai. Possíveis problemas: campo compartilhado entre várias relações do mesmo modelo; relações **opcionais** compostas com `onDelete: SetNull` tentariam anular `organization_id` (NOT NULL); `MATCH SIMPLE` do PostgreSQL ignora a verificação se **qualquer** coluna da FK for NULL. | Usar `Restrict`/`NoAction`; evitar relações opcionais compostas. Se o Prisma não modelar alguma, a FK vai em SQL manual e o schema usa campos simples — **o teste de banco é a prova**, não o schema. (V3) |
+| **FK composta** `(organization_id, X_id) → X(organization_id, id)` | Exige `@@unique([organizationId, id])` no pai. Possíveis problemas: campo compartilhado entre várias relações do mesmo modelo; relações **opcionais** compostas com `onDelete: SetNull` tentariam anular `organization_id` (NOT NULL); `MATCH SIMPLE` do PostgreSQL ignora a verificação se **qualquer** coluna da FK for NULL. | Usar `Restrict`/`NoAction`; evitar relações opcionais compostas. **`onDelete: SetNull` é proibido em qualquer FK composta que inclua `organization_id`** (o Prisma apenas avisa e gera `ON DELETE SET NULL` sobre todas as colunas da FK). **`onUpdate: Restrict` é obrigatório** nessas relações, porque o Prisma emite `ON UPDATE CASCADE` por padrão. Se o Prisma não modelar alguma, a FK vai em SQL manual e o schema usa campos simples — **o teste de banco é a prova**, não o schema. (V3) |
 | **Constraints não modeladas** | `EXCLUDE`, `CHECK`, índices parciais, triggers: SQL manual em migrations; risco de *drift*. | Etapa 3: rodar `prisma migrate diff`/`migrate dev` e confirmar que não há drift nem tentativa de remover a constraint; teste de integração falha se ela não existir. (V4) |
-| **Erros de banco** | `23P01` (exclusão), `40P01` (deadlock) e `55P03` (`lock_timeout`) podem chegar como erro genérico, não como `P20xx`. | Spike: provocar cada um via ORM e via raw; fixar um *mapeador de erros* testado que lê o SQLSTATE. (V6, V15) |
+| **Erros de banco** | `23P01` (exclusão), `40P01` (deadlock) e `55P03` (`lock_timeout`) podem chegar como erro genérico, não como `P20xx`. | Spike: provocar cada um via ORM e via raw; fixar um *mapeador de erros* testado que lê o SQLSTATE. **Verificado no Prisma 7 com driver adapter `pg`:** o SQLSTATE está em `error.meta.driverAdapterError.cause.originalCode`, tanto em operações do ORM (`P2039`, `P2002`…) quanto em `$queryRaw`/`$executeRaw` (`P2010`). Uma FK com `ON DELETE RESTRICT` retorna SQLSTATE **`23001`** (`restrict_violation`), não `23503`; o mapeador trata ambos como violação de FK e usa `P2002`/`P2003` como reserva. (V6, V15) |
 | **`SELECT … FOR NO KEY UPDATE`** | O Prisma Client não expõe lock de linha nativamente. | Usar `$queryRaw` dentro de transação interativa (arquivo na allowlist de raw SQL, `lib/db/locks/`). Confirmar também timeout padrão de transação interativa e configuração de isolamento. (V15) |
 | **Client extensions (`forTenant`)** | Atuam em operações **de topo**. Não cobrem `$queryRaw/$executeRaw`, filtros/`include`/`select` aninhados, nem escritas aninhadas (`connect`, `create`) que referenciem registros de outro tenant; semântica de `findUnique`/`upsert`/`createMany`/`updateMany` depende da versão. | O helper é **redução de risco**, não garantia (4.4). (V7) |
 | **Transações interativas** | Precisam usar o cliente já escopado; usar o cliente global dentro delas perde o escopo e o lock. | `forTenant(ctx).$transaction(fn)` entrega `tx` escopado; cliente global proibido em módulos de negócio. |
@@ -352,7 +352,7 @@ EmailOutbox  (global; não pertence a uma empresa)
 | **Session** | id, user_id, token_hash (único), active_organization_id?, credentials_version, expires_at, revoked_at?, last_seen_at, ip, user_agent | Token em claro nunca armazenado. |
 | **AuthToken** | id, user_id, type, token_hash (único), expires_at, used_at | Seção 3. |
 | **EmailOutbox** | id, to_email, template, payload_encrypted (com key_id), status, dead_reason, attempts, next_attempt_at, locked_until, lock_token, not_after, last_error, created_at, sent_at | Seção 3.6. Entrega *at-least-once*. |
-| **Organization** | id, name, slug (único), **timezone (imutável)**, status, **published_at?**, **public_min_notice_minutes (120)**, **public_max_advance_days (60)**, **public_max_active_bookings_per_phone (3)** | Valores entre parênteses são *configurações iniciais sujeitas à validação com usuários reais* (R6, 6.7). Editáveis só por `OWNER`. `slug` com lista de reservados. |
+| **Organization** | id, name, slug (único), **timezone (imutável)**, status (enum `OrganizationStatus`, valor inicial `{ ACTIVE }`, extensível por migrations futuras), **published_at?**, **public_min_notice_minutes (120)**, **public_max_advance_days (60)**, **public_max_active_bookings_per_phone (3)** | Valores entre parênteses são *configurações iniciais sujeitas à validação com usuários reais* (R6, 6.7). Editáveis só por `OWNER`. `slug` com lista de reservados. |
 | **Membership** | id, user_id, organization_id, role | `role` aceita somente `OWNER` no MVP (mecanismo extensível a decidir no spike, V16); `UNIQUE(user_id, organization_id)`. Exatamente 1 `OWNER` por empresa criada; **sem fluxo para adicionar ou remover membros no MVP** (evolução futura). |
 | **Service** | id, organization_id, name, duration_minutes, **buffer_minutes (default 0)**, price_cents?, active | Duração livre (inteiro ≥ 1), independente da grade de 15 min. |
 | **Professional** | id, organization_id, name, active | Sem `user_id` (D2). |
@@ -405,7 +405,18 @@ ALTER TABLE appointments
 2. **Alternativa:** trigger que **calcula e sobrescreve** `ends_at`/`blocked_until` (fonte única no banco). Só se o spike mostrar que o Prisma lida bem com colunas preenchidas por trigger.
 3. **Último recurso:** só a função central na aplicação + `CHECK (blocked_until >= ends_at)` + testes. Menos seguro: SQL manual poderia gravar incoerência.
 
-**Decisão final entre `CHECK`/trigger-rejeita/trigger-sobrescreve/só-aplicação: etapa 3**, com estes critérios: (a) funciona com `create`/`update` do Prisma sem contornos; (b) a exclusão usa `blocked_until` sem recursão de efeitos; (c) sobrevive a `pg_dump`/restore; (d) tentar gravar via SQL cru um `blocked_until` incoerente **falha**. O resultado entra neste documento antes da etapa 4.
+**Decisão aprovada (Etapa 3, V8): opção 1, com `CHECK`.** A aplicação continua dona do cálculo (`computeAppointmentRange`) e o banco rejeita valores incoerentes, na migration manual da Etapa 10:
+
+```sql
+ALTER TABLE appointments
+  ADD CONSTRAINT appointments_range_coherent
+  CHECK (
+    ends_at = starts_at + make_interval(mins => duration_minutes_snapshot)
+    AND blocked_until = ends_at + make_interval(mins => buffer_minutes_snapshot)
+  );
+```
+
+Critérios avaliados no spike (evidência em [`STAGE-3-VALIDATIONS.md`](./STAGE-3-VALIDATIONS.md), V8): (a) funciona com `create`/`update` do Prisma sem contornos; (b) a exclusão usa `blocked_until` sem recursão de efeitos; (c) sobrevive a `pg_dump`/restore; (d) gravar via SQL cru um valor incoerente **falha** (`23514`). Consequências: `timestamptz + interval` não é `IMMUTABLE`, então coluna gerada e índice sobre a expressão não são possíveis, e `make_interval` (que é) é a forma exigida; todo `UPDATE` que mova um agendamento deve recalcular `starts_at`, `ends_at` e `blocked_until` juntos, pois uma atualização parcial é rejeitada. O trigger que sobrescreve valores (opção 2) não foi testado e permanece descartado.
 
 **Testes obrigatórios da constraint** (Postgres real):
 
@@ -416,9 +427,9 @@ ALTER TABLE appointments
 5. Sobreposição apenas dentro do buffer ⇒ falha; fora do buffer ⇒ passa.
 6. `UPDATE` (remarcar) não conflita consigo mesmo; para cima de outro ativo ⇒ falha.
 7. `(organization_id = A, professional_id = profissional da B)` via SQL cru ⇒ falha por **FK composta**.
-8. N inserções paralelas no mesmo slot ⇒ 1 sucesso, N−1 com 409.
+8. N inserções concorrentes no mesmo slot, **com o lock N2 do profissional (6.5)** ⇒ 1 sucesso e N−1 conflitos `23P01` (HTTP 409 `SLOT_UNAVAILABLE`), sem `40P01`. **Sem** o lock, a constraint mantém a invariante (nunca há dois ativos), mas os perdedores podem receber `40P01` (deadlock resolvido após `deadlock_timeout`) em vez de `23P01`; o teste deve cobrir os dois cenários, e o lock é obrigatório no fluxo normal.
 9. A constraint existe no banco migrado (`pg_constraint`) — protege contra drift.
-10. Incoerência `ends_at`/`blocked_until`/snapshots via SQL cru ⇒ rejeitada (conforme a opção escolhida em V8; se a opção final for a 3, este teste documenta explicitamente o que **não** é garantido).
+10. Incoerência `ends_at`/`blocked_until`/snapshots via SQL cru ⇒ rejeitada pelo `CHECK` `appointments_range_coherent` (opção 1 aprovada em V8; SQLSTATE `23514`). O teste também cobre a ressalva documentada: uma atualização parcial (por exemplo, mudar só `starts_at` sem recalcular `ends_at` e `blocked_until`) é rejeitada.
 
 ### 6.2 Disponibilidade (cálculo de slots)
 
@@ -648,7 +659,7 @@ CI (GitHub Actions) com Postgres: `lint`, `typecheck`, `test`, `build`.
 ### Erros e validação
 
 - `errorHandler` único; `AppError(code, httpStatus, message, details?)`; formato `{ "error": { "code", "message", "details?", "requestId" } }`.
-- Mapeamento: Zod ⇒ 400; não autenticado ⇒ 401; sem permissão (membro) ⇒ 403; recurso de outra empresa/inexistente ⇒ **404**; conflito (`23P01`, `P2002`, versão, idempotência reutilizada, `ACTIVE_ORG_CHANGED`, conflitos de `TimeOff`/`WorkingHours`) ⇒ **409**; limite de agendamentos do telefone ⇒ 422 `BOOKING_LIMIT_REACHED`; rate limit ⇒ 429; `lock_timeout`/deadlock ⇒ 503 `TEMPORARILY_BUSY`; demais ⇒ 500 genérico.
+- Mapeamento: Zod ⇒ 400; não autenticado ⇒ 401; sem permissão (membro) ⇒ 403; recurso de outra empresa/inexistente ⇒ **404**; conflito (`23P01`, `P2002`, versão, idempotência reutilizada, `ACTIVE_ORG_CHANGED`, conflitos de `TimeOff`/`WorkingHours`) ⇒ **409**; limite de agendamentos do telefone ⇒ 422 `BOOKING_LIMIT_REACHED`; rate limit ⇒ 429; `lock_timeout`/deadlock ⇒ 503 `TEMPORARILY_BUSY`; demais ⇒ 500 genérico. A classificação dos erros de banco lê o SQLSTATE em `error.meta.driverAdapterError.cause.originalCode` (Prisma 7 com driver adapter; ver 4.3), e uma FK com `RESTRICT` pode retornar `23001` além de `23503`.
 - Frontend centraliza: 401 ⇒ login; 409 `SLOT_UNAVAILABLE` ⇒ recarregar slots; 409 `ACTIVE_ORG_CHANGED` ⇒ recarregar app.
 
 ---
@@ -784,26 +795,26 @@ Integração com WhatsApp (mensagens, webhooks, worker de mensageria), confirma�
 
 ## 13. Validações técnicas pendentes ([VALIDAR])
 
-> Nenhum item desta tabela é decisão de produto. **Todos estão com estado "não verificado"**: nenhum spike foi executado e nenhuma documentação oficial foi consultada para esta lista. Até serem resolvidos **com evidência** (teste ou documentação oficial citada), não devem ser tratados como garantia.
+> Nenhum item desta tabela é decisão de produto. Os itens V1–V8, V13, V15 e V16 foram **resolvidos na Etapa 3**, com evidência (testes de integração em PostgreSQL real e saídas de CLI) registrada em [`docs/STAGE-3-VALIDATIONS.md`](./STAGE-3-VALIDATIONS.md). Os demais continuam **"não verificado"**: nenhum spike foi executado e nenhuma documentação oficial foi consultada para eles. Até serem resolvidos **com evidência** (teste ou documentação oficial citada), não devem ser tratados como garantia.
 
 | # | Item | Resolve em | Estado |
 |---|---|---|---|
-| V1 | `date-fns-tz`: compatibilidade com a versão de `date-fns` escolhida; IANA/DST corretos | Etapa 3 | Não verificado |
-| V2 | UUID v7: `uuid(7)` no Prisma escolhido; versão do PostgreSQL; geração na aplicação; ordenação | Etapa 3 | Não verificado |
-| V3 | FK compostas no Prisma: campo compartilhado entre relações, relações opcionais, `onDelete` | Etapa 3 | Não verificado |
-| V4 | `EXCLUDE`/`CHECK`/índices parciais/trigger em migration manual sem drift (`migrate diff`) | Etapa 3 | Não verificado |
-| V5 | `btree_gist` com `uuid` na versão do PostgreSQL | Etapa 3 | Não verificado |
-| V6 | Mapeamento de SQLSTATE `23P01` e `P2002` no Prisma | Etapa 3 | Não verificado |
-| V7 | Comportamento de `forTenant` em `findUnique`, `upsert`, `createMany`, escritas e leituras aninhadas | Etapas 3 e 6 | Não verificado |
-| V8 | Coerência de `ends_at`/`blocked_until`: `CHECK` com `timestamptz + intervalo` (aceito? estável em dump/restore?), trigger que rejeita vs. que sobrescreve, atrito com Prisma — **decide a opção de 6.1** | Etapa 3 | Não verificado |
+| V1 | `date-fns-tz`: compatibilidade com a versão de `date-fns` escolhida; IANA/DST corretos | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V1 |
+| V2 | UUID v7: `uuid(7)` no Prisma escolhido; versão do PostgreSQL; geração na aplicação; ordenação | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V2 |
+| V3 | FK compostas no Prisma: campo compartilhado entre relações, relações opcionais, `onDelete` | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V3 |
+| V4 | `EXCLUDE`/`CHECK`/índices parciais/trigger em migration manual sem drift (`migrate diff`) | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V4 |
+| V5 | `btree_gist` com `uuid` na versão do PostgreSQL | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V5 |
+| V6 | Mapeamento de SQLSTATE `23P01` e `P2002` no Prisma | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V6 |
+| V7 | Comportamento de `forTenant` em `findUnique`, `upsert`, `createMany`, escritas e leituras aninhadas | Etapas 3 e 6 | **Resolvido com ressalva** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V7. Ressalva: o teste foi um protótipo descartável; `$queryRaw`, filtros/`include` aninhados e escritas aninhadas **não** são cobertos pelo helper (a garantia nesses casos é a FK composta); a implementação de produção e seus testes continuam na Etapa 6 |
+| V8 | Coerência de `ends_at`/`blocked_until`: `CHECK` com `timestamptz + intervalo` (aceito? estável em dump/restore?), trigger que rejeita vs. que sobrescreve, atrito com Prisma — **decide a opção de 6.1** | Etapa 3 | **Resolvido com ressalva** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V8. Opção 1 (`CHECK`) aprovada em 6.1. Ressalvas: coluna gerada é impossível (`timestamptz + interval` não é `IMMUTABLE`); a aplicação deve recalcular `starts_at`, `ends_at` e `blocked_until` juntos em todo `UPDATE`; o trigger que sobrescreve não foi testado |
 | V9 | Biblioteca/lista de senhas comuns; parâmetros vigentes de argon2id | Etapa 4 | Não verificado |
 | V10 | Provedor de e-mail: limites do plano, SPF/DKIM/DMARC, entregabilidade, chave de idempotência, classificação de erro permanente | Etapa 5 (escolha) e 16 | Não verificado |
 | V11 | WhatsApp Cloud API: regras, preços, templates, onboarding, segurança | Somente se o pós-MVP for autorizado | Não verificado |
 | V12 | Preços de hospedagem | Etapa 16 | Não verificado |
-| V13 | Semântica de `INSERT … ON CONFLICT DO UPDATE … WHERE` (re-reivindicação de registro vencido) sob concorrência | Etapa 3 | Não verificado |
+| V13 | Semântica de `INSERT … ON CONFLICT DO UPDATE … WHERE` (re-reivindicação de registro vencido) sob concorrência | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V13 |
 | V14 | Cifragem do payload da outbox (AES-256-GCM via módulo nativo do Node), gestão/rotação da chave, comportamento com `key_id` desconhecido | Etapa 5 | Não verificado |
-| V15 | `SELECT … FOR NO KEY UPDATE` via `$queryRaw` em transação interativa do Prisma; timeout padrão da transação; `lock_timeout`; mapeamento de `40P01`/`55P03`; compatibilidade entre `FOR NO KEY UPDATE` e a checagem `FOR KEY SHARE` das chaves estrangeiras | Etapa 3 | Não verificado |
-| V16 | Mecanismo extensível para `memberships.role` (enum nativo vs. texto com `CHECK`), pensando na futura adição de `ADMIN` | Etapa 3 | Não verificado |
+| V15 | `SELECT … FOR NO KEY UPDATE` via `$queryRaw` em transação interativa do Prisma; timeout padrão da transação; `lock_timeout`; mapeamento de `40P01`/`55P03`; compatibilidade entre `FOR NO KEY UPDATE` e a checagem `FOR KEY SHARE` das chaves estrangeiras | Etapa 3 | **Resolvido** (Etapa 3) — ver `STAGE-3-VALIDATIONS.md`, V15 |
+| V16 | Mecanismo extensível para `memberships.role` (enum nativo vs. texto com `CHECK`), pensando na futura adição de `ADMIN` | Etapa 3 | **Resolvido** (Etapa 3) — enum nativo; ver `STAGE-3-VALIDATIONS.md`, V16 |
 
 **Resolvem-se na Etapa 3, antes da Etapa 4:** V1–V8, V13, V15, V16. **Em etapas posteriores:** V9 (4), V14 (5), V10 (5 e 16), V12 (16). **Condicional:** V11.
 

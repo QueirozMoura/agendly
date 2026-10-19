@@ -1,0 +1,130 @@
+// SPIKE da Etapa 3 — NÃO é o schema de produção. Banco próprio (agendly_spike).
+// Reproduz o recorte de tabelas necessário para validar V3, V4, V5, V6, V7, V8, V13, V15 e V16.
+// Os modelos reais (Service, Professional, Customer, Appointment...) só nascem nas etapas 7–10.
+
+generator client {
+  provider = "prisma-client"
+  output   = "./gen"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SpikeStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum SpikeRole {
+  OWNER
+}
+
+model Org {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  name          String
+  professionals Professional[]
+  services      Service[]
+  customers     Customer[]
+  appointments  Appointment[]
+  notes         Note[]
+  members       Member[]
+
+  @@map("orgs")
+}
+
+model Member {
+  id    String    @id @default(uuid(7)) @db.Uuid
+  orgId String    @map("org_id") @db.Uuid
+  role  SpikeRole
+  org   Org       @relation(fields: [orgId], references: [id])
+
+  @@map("members")
+}
+
+model Professional {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  name           String
+  org            Org           @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+  notes          Note[]
+
+  @@unique([organizationId, id])
+  @@map("professionals")
+}
+
+model Service {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  name           String
+  org            Org           @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+
+  @@unique([organizationId, id])
+  @@map("services")
+}
+
+model Customer {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  name           String
+  org            Org           @relation(fields: [organizationId], references: [id])
+  appointments   Appointment[]
+
+  @@unique([organizationId, id])
+  @@map("customers")
+}
+
+model Appointment {
+  id                      String      @id @default(uuid(7)) @db.Uuid
+  organizationId          String      @map("organization_id") @db.Uuid
+  professionalId          String      @map("professional_id") @db.Uuid
+  serviceId               String      @map("service_id") @db.Uuid
+  customerId              String      @map("customer_id") @db.Uuid
+  startsAt                DateTime    @map("starts_at") @db.Timestamptz(3)
+  endsAt                  DateTime    @map("ends_at") @db.Timestamptz(3)
+  blockedUntil            DateTime    @map("blocked_until") @db.Timestamptz(3)
+  durationMinutesSnapshot Int         @map("duration_minutes_snapshot")
+  bufferMinutesSnapshot   Int         @map("buffer_minutes_snapshot")
+  status                  SpikeStatus @default(SCHEDULED)
+  version                 Int         @default(0)
+
+  org          Org          @relation(fields: [organizationId], references: [id])
+  professional Professional @relation(fields: [organizationId, professionalId], references: [organizationId, id], onDelete: Restrict)
+  service      Service      @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
+  customer     Customer     @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+
+  @@map("appointments")
+}
+
+// Relação composta OPCIONAL (V3): professionalId pode ser NULL.
+model Note {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  professionalId String?       @map("professional_id") @db.Uuid
+  text           String
+  org            Org           @relation(fields: [organizationId], references: [id])
+  professional   Professional? @relation(fields: [organizationId, professionalId], references: [organizationId, id], onDelete: SetNull)
+
+  @@map("notes")
+}
+
+// V13: re-reivindicação atômica de chave de idempotência vencida.
+model IdempotencyRecord {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  scope          String
+  key            String
+  requestHash    String   @map("request_hash")
+  responseStatus Int?     @map("response_status")
+  claimedBy      String?  @map("claimed_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, scope, key])
+  @@map("idempotency_records")
+}

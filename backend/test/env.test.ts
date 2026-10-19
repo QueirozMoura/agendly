@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { EnvError, loadEnv } from "../src/config/env.ts";
 
@@ -24,15 +25,19 @@ describe("loadEnv", () => {
 
 describe("server.ts com ambiente inválido", () => {
   it("encerra com código 1 e não sobe", () => {
-    const r = spawnSync(process.execPath, ["src/server.ts"], {
-      env: {
-        PATH: process.env.PATH ?? "",
-        PORT: "0",
-        DATABASE_URL: "nao-e-url",
+    const r = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("../src/server.ts", import.meta.url))],
+      {
+        env: {
+          PATH: process.env.PATH ?? "",
+          PORT: "0",
+          DATABASE_URL: "nao-e-url",
+        },
+        encoding: "utf8",
+        timeout: 10_000,
       },
-      encoding: "utf8",
-      timeout: 10_000,
-    });
+    );
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("DATABASE_URL");
     expect(r.stderr).not.toContain("nao-e-url");

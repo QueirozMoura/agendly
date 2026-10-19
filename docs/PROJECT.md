@@ -88,10 +88,17 @@ Detalhes, justificativas e rastreio em `docs/ARCHITECTURE.md`, seção 15.
 - Desenvolvimento incremental, em etapas pequenas e verificáveis.
 - Nenhuma integração paga sem necessidade validada.
 - Nenhuma garantia técnica é presumida: itens marcados como `[VALIDAR]` em
-  `docs/ARCHITECTURE.md` (seção 13) estão todos **não verificados** e só serão
-  tratados como fato após evidência (teste ou documentação oficial).
-- Os testes e critérios de aceite descritos nos documentos são especificações;
-  nenhum foi escrito ou executado ainda.
+  `docs/ARCHITECTURE.md` (seção 13) só são tratados como fato após evidência
+  (teste ou documentação oficial). Os itens V1–V8, V13, V15 e V16 foram resolvidos
+  na Etapa 3, com resultados e ressalvas (V7 e V8) em
+  `docs/STAGE-3-VALIDATIONS.md`; os demais (V9–V12 e V14) continuam
+  **não verificados**.
+- Os testes e critérios de aceite descritos nos documentos são especificações.
+  Parte deles já foi implementada e executada nas etapas concluídas (backend
+  base na Etapa 2; fundação do banco e validações técnicas na Etapa 3). O plano
+  de testes como um todo ainda não está pronto: os testes das etapas seguintes
+  (autenticação, isolamento entre empresas, concorrência de agendamentos, outbox
+  de e-mail, frontend etc.) continuam por escrever e executar.
 
 ## Stack planejada
 - Frontend: React + TypeScript + Vite.

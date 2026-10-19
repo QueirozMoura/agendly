@@ -8,3 +8,6 @@ coverage/
 *.log
 .DS_Store
 .vscode/
+
+# Prisma Client gerado (npm run db:generate)
+**/generated/

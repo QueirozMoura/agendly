@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Etapa 3: apenas a fundação de identidade (seção 5 de docs/ARCHITECTURE.md).
+// IDs: UUID v7 gerado no cliente pelo Prisma; ver docs/STAGE-3-VALIDATIONS.md (V2).
+
+enum MembershipRole {
+  OWNER // MVP: único valor (V16 — enum nativo; ADMIN entra depois com ALTER TYPE ... ADD VALUE)
+}
+
+enum OrganizationStatus {
+  ACTIVE
+}
+
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model User {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  email              String    @unique // sempre minúsculo (CHECK users_email_lowercase, SQL manual)
+  passwordHash       String    @map("password_hash")
+  name               String
+  emailVerifiedAt    DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  credentialsVersion Int       @default(0) @map("credentials_version")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  memberships Membership[]
+  sessions    Session[]
+  authTokens  AuthToken[]
+
+  @@map("users")
+}
+
+model Organization {
+  id                              String             @id @default(uuid(7)) @db.Uuid
+  name                            String
+  slug                            String             @unique
+  timezone                        String // IANA; imutável após a criação (R9)
+  status                          OrganizationStatus @default(ACTIVE)
+  publishedAt                     DateTime?          @map("published_at") @db.Timestamptz(3)
+  publicMinNoticeMinutes          Int                @default(120) @map("public_min_notice_minutes")
+  publicMaxAdvanceDays            Int                @default(60) @map("public_max_advance_days")
+  publicMaxActiveBookingsPerPhone Int                @default(3) @map("public_max_active_bookings_per_phone")
+  createdAt                       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  memberships Membership[]
+  sessions    Session[]
+
+  @@map("organizations")
+}
+
+model Membership {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  role           MembershipRole
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+model Session {
+  id                   String    @id @default(uuid(7)) @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  tokenHash            String    @unique @map("token_hash")
+  activeOrganizationId String?   @map("active_organization_id") @db.Uuid
+  credentialsVersion   Int       @map("credentials_version")
+  expiresAt            DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt            DateTime? @map("revoked_at") @db.Timestamptz(3)
+  lastSeenAt           DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  ip                   String?
+  userAgent            String?   @map("user_agent")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user               User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  activeOrganization Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model AuthToken {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  type      AuthTokenType
+  tokenHash String        @unique @map("token_hash")
+  expiresAt DateTime      @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime?     @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("auth_tokens")
+}
