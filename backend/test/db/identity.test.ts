@@ -73,7 +73,7 @@ describe("esquema de identidade", () => {
     });
     await expect(
       prisma.organization.create({
-        data: { ...org("x"), publicMaxActiveBookingsPerPhone: 0 },
+        data: { ...org("outra-empresa"), publicMaxActiveBookingsPerPhone: 0 },
       }),
     ).rejects.toSatisfy((e) => classifyDbError(e) === "check_violation");
   });

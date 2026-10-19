@@ -17,6 +17,8 @@ export interface SessionUser {
 
 export interface AuthContext {
   sessionId: string;
+  /** Empresa ativa da sessão (4.1). A validade da membership é conferida pelo tenantPlugin, não aqui. */
+  activeOrganizationId: string | null;
   lastSeenAt: Date;
   user: SessionUser;
 }
@@ -64,6 +66,7 @@ export async function findValidSession(
     relationLoadStrategy: "join",
     select: {
       id: true,
+      activeOrganizationId: true,
       credentialsVersion: true,
       expiresAt: true,
       revokedAt: true,
@@ -92,6 +95,7 @@ export async function findValidSession(
   const { id, email, name, emailVerifiedAt } = session.user;
   return {
     sessionId: session.id,
+    activeOrganizationId: session.activeOrganizationId,
     lastSeenAt: session.lastSeenAt,
     user: { id, email, name, emailVerifiedAt },
   };

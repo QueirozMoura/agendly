@@ -7,3 +7,11 @@ import type { TxClient } from "../client.ts";
 export async function lockUser(tx: TxClient, userId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`;
 }
+
+/** Linha da empresa (6.5: "Editar configurações da empresa": linha da empresa apenas). Serializa edições concorrentes. */
+export async function lockOrganization(
+  tx: TxClient,
+  organizationId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM organizations WHERE id = ${organizationId}::uuid FOR NO KEY UPDATE`;
+}

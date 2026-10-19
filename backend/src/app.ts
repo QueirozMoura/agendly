@@ -9,7 +9,9 @@ import type { PrismaClient } from "./lib/db/client.ts";
 import type { Keyring } from "./lib/email/keyring.ts";
 import { authRoutes } from "./modules/auth/routes.ts";
 import { registerCsrfProtection } from "./plugins/csrf.ts";
+import { organizationRoutes } from "./modules/organizations/routes.ts";
 import { registerErrorHandling } from "./plugins/error-handler.ts";
+import { installRouteRegistry } from "./plugins/route-registry.ts";
 import {
   registerHealthRoutes,
   type HealthDeps,
@@ -55,6 +57,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     reply.header("x-request-id", request.id);
   });
 
+  installRouteRegistry(app); // antes de qualquer rota
   registerErrorHandling(app);
   registerHealthRoutes(app, { checkDatabase: options.checkDatabase });
 
@@ -63,6 +66,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     registerCsrfProtection(app, allowedOrigins);
     app.register(cookie);
     app.register(rateLimit, { global: false }); // limites aplicados por rota (createRateLimit)
+    app.register(organizationRoutes, { prisma, secureCookies });
     app.register(authRoutes, {
       prisma,
       secureCookies,

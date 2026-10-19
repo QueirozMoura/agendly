@@ -10,10 +10,12 @@ export function registerHealthRoutes(
   deps: HealthDeps,
 ): void {
   // Liveness: o processo responde.
-  app.get("/api/health", async () => ({ status: "ok" }));
+  app.get("/api/health", { config: { access: "none" } }, async () => ({
+    status: "ok",
+  }));
 
   // Readiness: o banco responde.
-  app.get("/api/ready", async (request) => {
+  app.get("/api/ready", { config: { access: "none" } }, async (request) => {
     try {
       await deps.checkDatabase();
     } catch (err) {

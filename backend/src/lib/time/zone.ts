@@ -39,3 +39,15 @@ export function utcToZonedLocal(utc: Date, timeZone: string): string {
     throw new TimeZoneError(`Fuso inválido: ${timeZone}`);
   return formatInTimeZone(utc, timeZone, LOCAL_FORMAT);
 }
+
+/**
+ * Nome IANA canônico ("America/Sao_Paulo") ou undefined. Exige o formato Área/Local (ou "UTC"): rejeita
+ * deslocamentos fixos ("+03:00") e abreviações legadas ("EST"), que o Intl aceitaria mas não são fusos de
+ * calendário com horário de verão. A caixa é normalizada (o Intl é insensível a maiúsculas).
+ */
+export function canonicalTimeZone(input: string): string | undefined {
+  if (!/^(UTC|[A-Za-z_]+(\/[A-Za-z0-9_+-]+)+)$/i.test(input)) return undefined;
+  if (!isValidTimeZone(input)) return undefined;
+  return new Intl.DateTimeFormat("en-US", { timeZone: input }).resolvedOptions()
+    .timeZone;
+}

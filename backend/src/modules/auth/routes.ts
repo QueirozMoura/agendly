@@ -12,6 +12,7 @@ import {
   verifyAgainstDummy,
   verifyPassword,
 } from "./password.ts";
+import { makeAuthenticate } from "./authenticate.ts";
 import type { OutboxContext } from "../email/outbox.ts";
 import {
   logoutAllDevices,
@@ -30,11 +31,8 @@ import {
   verifyEmailBody,
 } from "./schemas.ts";
 import {
-  SESSION_TOUCH_INTERVAL_MS,
   createSession,
-  findValidSession,
   revokeSessionByToken,
-  touchSession,
   type AuthContext,
 } from "./session.ts";
 
@@ -46,7 +44,6 @@ export interface AuthRoutesOptions {
 
 declare module "fastify" {
   interface FastifyRequest {
-    auth?: AuthContext;
     /** Chave (hash do e-mail ou do id do usuário) dos limitadores por identidade; definida só nas rotas de auth. */
     rateKey?: string;
   }
@@ -69,6 +66,9 @@ const FORGOT_MESSAGE =
 const RESEND_MESSAGE =
   "Se a confirmação de e-mail ainda for necessária, enviaremos um novo link.";
 
+/** Rotas de autenticação/conta: sem escopo de empresa (classificação exigida pelo registro de rotas, 4.4 item 4). */
+const AUTH_ROUTE = { access: "auth" } as const;
+
 const REGISTER_MESSAGE =
   "Cadastro recebido. Use seu e-mail e senha para entrar. Se já houver uma conta com este e-mail, nada foi alterado.";
 
@@ -77,6 +77,7 @@ export async function authRoutes(
   opts: AuthRoutesOptions,
 ): Promise<void> {
   const { prisma, secureCookies } = opts;
+  const authenticate = makeAuthenticate(app, { prisma, secureCookies });
   const account: AccountDeps = { prisma, outbox: opts.outbox };
   const cookieName = sessionCookieName(secureCookies);
 
@@ -136,86 +137,98 @@ export async function authRoutes(
   });
 
   // --- Cadastro: resposta idêntica exista a conta ou não (sem enumeração) ---
-  app.post("/api/auth/register", async (request, reply) => {
-    const body = registerBody.parse(request.body);
-    await enforce(
-      request,
-      reply,
-      [limiters.registerIp, limiters.registerEmail],
-      body.email,
-    );
+  app.post(
+    "/api/auth/register",
+    { config: AUTH_ROUTE },
+    async (request, reply) => {
+      const body = registerBody.parse(request.body);
+      await enforce(
+        request,
+        reply,
+        [limiters.registerIp, limiters.registerEmail],
+        body.email,
+      );
 
-    // O hash é calculado SEMPRE, antes de saber se o e-mail existe: mesmo custo nos dois caminhos.
-    const passwordHash = await hashPassword(body.password);
-    await registerUser(account, {
-      email: body.email,
-      name: body.name,
-      passwordHash,
-    });
-    return reply.status(202).send({ message: REGISTER_MESSAGE });
-  });
+      // O hash é calculado SEMPRE, antes de saber se o e-mail existe: mesmo custo nos dois caminhos.
+      const passwordHash = await hashPassword(body.password);
+      await registerUser(account, {
+        email: body.email,
+        name: body.name,
+        passwordHash,
+      });
+      return reply.status(202).send({ message: REGISTER_MESSAGE });
+    },
+  );
 
   // --- Login ---
-  app.post("/api/auth/login", async (request, reply) => {
-    const body = loginBody.parse(request.body);
-    await enforce(
-      request,
-      reply,
-      [limiters.loginIp, limiters.loginEmail],
-      body.email,
-    );
-
-    // Leitura ÚNICA: hash da senha e credentials_version vêm da mesma linha (3.1, S9). A sessão
-    // criada abaixo carrega exatamente a versão que acompanhava o hash verificado.
-    const user = await prisma.user.findUnique({
-      where: { email: body.email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        emailVerifiedAt: true,
-        passwordHash: true,
-        credentialsVersion: true,
-      },
-    });
-
-    const ok = user
-      ? await verifyPassword(body.password, user.passwordHash)
-      : await verifyAgainstDummy(body.password);
-    if (!user || !ok) {
-      throw new AppError(
-        "INVALID_CREDENTIALS",
-        401,
-        "E-mail ou senha incorretos.",
+  app.post(
+    "/api/auth/login",
+    { config: AUTH_ROUTE },
+    async (request, reply) => {
+      const body = loginBody.parse(request.body);
+      await enforce(
+        request,
+        reply,
+        [limiters.loginIp, limiters.loginEmail],
+        body.email,
       );
-    }
 
-    const { token } = await createSession(prisma, {
-      userId: user.id,
-      credentialsVersion: user.credentialsVersion,
-      now: app.clock.now(),
-      ip: request.ip,
-      userAgent: request.headers["user-agent"],
-    });
-    setSessionCookie(reply, secureCookies, token);
-    return reply.send({ user: publicUser(user) });
-  });
+      // Leitura ÚNICA: hash da senha e credentials_version vêm da mesma linha (3.1, S9). A sessão
+      // criada abaixo carrega exatamente a versão que acompanhava o hash verificado.
+      const user = await prisma.user.findUnique({
+        where: { email: body.email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          emailVerifiedAt: true,
+          passwordHash: true,
+          credentialsVersion: true,
+        },
+      });
+
+      const ok = user
+        ? await verifyPassword(body.password, user.passwordHash)
+        : await verifyAgainstDummy(body.password);
+      if (!user || !ok) {
+        throw new AppError(
+          "INVALID_CREDENTIALS",
+          401,
+          "E-mail ou senha incorretos.",
+        );
+      }
+
+      const { token } = await createSession(prisma, {
+        userId: user.id,
+        credentialsVersion: user.credentialsVersion,
+        now: app.clock.now(),
+        ip: request.ip,
+        userAgent: request.headers["user-agent"],
+      });
+      setSessionCookie(reply, secureCookies, token);
+      return reply.send({ user: publicUser(user) });
+    },
+  );
 
   // --- Logout: idempotente; sempre limpa o cookie ---
-  app.post("/api/auth/logout", async (request, reply) => {
-    await revokeSessionByToken(
-      prisma,
-      request.cookies[cookieName],
-      app.clock.now(),
-    );
-    clearSessionCookie(reply, secureCookies);
-    return reply.status(204).send();
-  });
+  app.post(
+    "/api/auth/logout",
+    { config: AUTH_ROUTE },
+    async (request, reply) => {
+      await revokeSessionByToken(
+        prisma,
+        request.cookies[cookieName],
+        app.clock.now(),
+      );
+      clearSessionCookie(reply, secureCookies);
+      return reply.status(204).send();
+    },
+  );
 
   // --- Sair de todos os dispositivos (A1 → A3) ---
   app.post(
     "/api/auth/logout-all",
-    { preHandler: authenticate },
+    { preHandler: authenticate, config: AUTH_ROUTE },
     async (request, reply) => {
       await logoutAllDevices(account, (request.auth as AuthContext).user.id);
       clearSessionCookie(reply, secureCookies);
@@ -224,17 +237,21 @@ export async function authRoutes(
   );
 
   // --- Verificação de e-mail (3.3): token no CORPO, nunca em query string ---
-  app.post("/api/auth/verify-email", async (request, reply) => {
-    const body = verifyEmailBody.parse(request.body);
-    await enforce(request, reply, [limiters.verifyIp]);
-    await verifyEmail(account, body.token);
-    return reply.status(204).send();
-  });
+  app.post(
+    "/api/auth/verify-email",
+    { config: AUTH_ROUTE },
+    async (request, reply) => {
+      const body = verifyEmailBody.parse(request.body);
+      await enforce(request, reply, [limiters.verifyIp]);
+      await verifyEmail(account, body.token);
+      return reply.status(204).send();
+    },
+  );
 
   // --- Reenvio da verificação: limite por usuário e por IP; resposta igual verificado ou não ---
   app.post(
     "/api/auth/resend-verification",
-    { preHandler: authenticate },
+    { preHandler: authenticate, config: AUTH_ROUTE },
     async (request, reply) => {
       const { user } = request.auth as AuthContext;
       await enforce(
@@ -249,60 +266,44 @@ export async function authRoutes(
   );
 
   // --- Recuperação de senha (3.4): 202 e mensagem idênticas exista o e-mail ou não ---
-  app.post("/api/auth/forgot-password", async (request, reply) => {
-    const body = forgotPasswordBody.parse(request.body);
-    await enforce(
-      request,
-      reply,
-      [limiters.forgotIp, limiters.forgotEmail],
-      body.email,
-    );
-    await requestPasswordReset(account, body.email);
-    return reply.status(202).send({ message: FORGOT_MESSAGE });
-  });
+  app.post(
+    "/api/auth/forgot-password",
+    { config: AUTH_ROUTE },
+    async (request, reply) => {
+      const body = forgotPasswordBody.parse(request.body);
+      await enforce(
+        request,
+        reply,
+        [limiters.forgotIp, limiters.forgotEmail],
+        body.email,
+      );
+      await requestPasswordReset(account, body.email);
+      return reply.status(202).send({ message: FORGOT_MESSAGE });
+    },
+  );
 
-  app.post("/api/auth/reset-password", async (request, reply) => {
-    const body = resetPasswordBody.parse(request.body);
-    await enforce(request, reply, [limiters.resetIp]);
-    // Hash lento calculado ANTES da transação (não pode segurar locks), mesmo se o token for inválido.
-    const newPasswordHash = await hashPassword(body.newPassword);
-    await resetPassword(account, { rawToken: body.token, newPasswordHash });
-    clearSessionCookie(reply, secureCookies);
-    return reply.status(204).send();
-  });
+  app.post(
+    "/api/auth/reset-password",
+    { config: AUTH_ROUTE },
+    async (request, reply) => {
+      const body = resetPasswordBody.parse(request.body);
+      await enforce(request, reply, [limiters.resetIp]);
+      // Hash lento calculado ANTES da transação (não pode segurar locks), mesmo se o token for inválido.
+      const newPasswordHash = await hashPassword(body.newPassword);
+      await resetPassword(account, { rawToken: body.token, newPasswordHash });
+      clearSessionCookie(reply, secureCookies);
+      return reply.status(204).send();
+    },
+  );
 
   // --- Sessão atual ---
-  app.get("/api/me", { preHandler: authenticate }, async (request) => {
-    return { user: publicUser((request.auth as AuthContext).user) };
-  });
-
-  async function authenticate(
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<void> {
-    const now = app.clock.now();
-    const ctx = await findValidSession(
-      prisma,
-      request.cookies[cookieName],
-      now,
-    );
-    if (!ctx) {
-      clearSessionCookie(reply, secureCookies); // sessão inválida/expirada/desatualizada: limpa o cookie
-      throw new AppError(
-        "UNAUTHENTICATED",
-        401,
-        "Sessão inválida ou expirada.",
-      );
-    }
-    request.auth = ctx;
-    if (now.getTime() - ctx.lastSeenAt.getTime() >= SESSION_TOUCH_INTERVAL_MS) {
-      try {
-        await touchSession(prisma, ctx.sessionId, now);
-      } catch (err) {
-        request.log.warn({ err }, "failed to update session last_seen_at"); // não derruba a requisição
-      }
-    }
-  }
+  app.get(
+    "/api/me",
+    { preHandler: authenticate, config: AUTH_ROUTE },
+    async (request) => {
+      return { user: publicUser((request.auth as AuthContext).user) };
+    },
+  );
 }
 
 function publicUser(u: {
