@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../../generated/prisma/client.ts";
+import { PrismaClient, type Prisma } from "../../generated/prisma/client.ts";
 
 // Único módulo de src/ que instancia PrismaClient (regra de 4.4). O Prisma 7 exige um driver adapter.
 type ClientOptions = NonNullable<ConstructorParameters<typeof PrismaClient>[0]>;
@@ -17,3 +17,5 @@ export function createPrismaClient(
 }
 
 export type { PrismaClient };
+/** Cliente recebido dentro de `prisma.$transaction(async (tx) => …)`. */
+export type TxClient = Prisma.TransactionClient;

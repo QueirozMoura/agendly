@@ -6,6 +6,7 @@ import Fastify, {
   type FastifyServerOptions,
 } from "fastify";
 import type { PrismaClient } from "./lib/db/client.ts";
+import type { Keyring } from "./lib/email/keyring.ts";
 import { authRoutes } from "./modules/auth/routes.ts";
 import { registerCsrfProtection } from "./plugins/csrf.ts";
 import { registerErrorHandling } from "./plugins/error-handler.ts";
@@ -17,6 +18,8 @@ import { systemClock, type Clock } from "./lib/time/clock.ts";
 
 export interface AuthOptions {
   prisma: PrismaClient;
+  /** Chaves de cifragem da outbox (o relógio vem de `clock`). */
+  keyring: Keyring;
   allowedOrigins: readonly string[];
   /** true em produção: cookie Secure com prefixo __Host-. */
   secureCookies: boolean;
@@ -56,11 +59,15 @@ export function buildApp(options: AppOptions): FastifyInstance {
   registerHealthRoutes(app, { checkDatabase: options.checkDatabase });
 
   if (options.auth) {
-    const { prisma, allowedOrigins, secureCookies } = options.auth;
+    const { prisma, keyring, allowedOrigins, secureCookies } = options.auth;
     registerCsrfProtection(app, allowedOrigins);
     app.register(cookie);
     app.register(rateLimit, { global: false }); // limites aplicados por rota (createRateLimit)
-    app.register(authRoutes, { prisma, secureCookies });
+    app.register(authRoutes, {
+      prisma,
+      secureCookies,
+      outbox: { keyring, clock: app.clock },
+    });
   }
   return app;
 }

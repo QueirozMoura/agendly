@@ -1,21 +1,24 @@
 import net from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.ts";
-import type { Env } from "../src/config/env.ts";
+import { loadEnv, type Env } from "../src/config/env.ts";
 import type { Database } from "../src/lib/db/database.ts";
 import { startServer, type RunningServer } from "../src/start.ts";
 
 function env(port = 0): Env {
   return {
-    NODE_ENV: "test",
+    ...loadEnv({
+      DATABASE_URL: "postgresql://u:p@localhost:5432/db",
+      NODE_ENV: "test",
+    }),
     HOST: "127.0.0.1",
     PORT: port,
     LOG_LEVEL: "silent",
-    DATABASE_URL: "postgresql://u:p@localhost:5432/db",
-    ALLOWED_ORIGINS: ["http://localhost:5173"],
-    TRUST_PROXY: false,
   };
 }
+
+// Os laços de fundo (outbox/manutenção) têm testes próprios; aqui não devem tocar no banco falso.
+const noJobs = () => ({ stop: async () => {} });
 
 function fakeDb(overrides: Partial<Database> = {}) {
   const db = {
@@ -58,6 +61,7 @@ describe("shutdown", () => {
     const db = fakeDb();
     running = await startServer(env(), {
       createDatabase: () => db,
+      startJobs: noJobs,
       buildApp: (options) => {
         const app = buildApp(options);
         app.addHook("onClose", async () => {
@@ -80,6 +84,7 @@ describe("shutdown", () => {
     });
     running = await startServer(env(), {
       createDatabase: () => db,
+      startJobs: noJobs,
       buildApp: (options) => {
         const app = buildApp(options);
         app.addHook("onClose", async () => {
@@ -115,6 +120,7 @@ describe("falhas de inicialização", () => {
     await expect(
       startServer(env(), {
         createDatabase: () => db,
+        startJobs: noJobs,
         buildApp: () => {
           throw new Error("falha ao montar app");
         },
@@ -131,6 +137,7 @@ describe("falhas de inicialização", () => {
     await expect(
       startServer(env(), {
         createDatabase: () => db,
+        startJobs: noJobs,
         logError,
         buildApp: () => {
           throw new Error("falha ao montar app");

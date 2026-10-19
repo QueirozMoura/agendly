@@ -3,6 +3,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { EnvError, loadEnv } from "../src/config/env.ts";
 
+const KEY_B64 = Buffer.alloc(32, 5).toString("base64");
+const PROD_KEYS = {
+  OUTBOX_ENCRYPTION_KEYS: `k1:${KEY_B64}`,
+  OUTBOX_CURRENT_KEY_ID: "k1",
+};
 const valid = { DATABASE_URL: "postgresql://u:p@localhost:5432/db" };
 
 describe("loadEnv", () => {
@@ -51,6 +56,7 @@ describe("loadEnv: origens e proxy", () => {
     expect(
       loadEnv({
         ...valid,
+        ...PROD_KEYS,
         NODE_ENV: "production",
         ALLOWED_ORIGINS: "https://a.com",
       }).NODE_ENV,
@@ -65,6 +71,66 @@ describe("loadEnv: origens e proxy", () => {
     }
     expect(() => loadEnv({ ...valid, TRUST_PROXY: "sim" })).toThrow(
       /TRUST_PROXY/,
+    );
+  });
+});
+
+describe("O10 — chave de cifragem da outbox", () => {
+  const prod = {
+    ...valid,
+    NODE_ENV: "production",
+    ALLOWED_ORIGINS: "https://a.com",
+  };
+
+  it("em produção a chave corrente é obrigatória (a API não inicia sem ela)", () => {
+    expect(() => loadEnv(prod)).toThrow(/OUTBOX_ENCRYPTION_KEYS/);
+    expect(() =>
+      loadEnv({ ...prod, OUTBOX_ENCRYPTION_KEYS: `k1:${KEY_B64}` }),
+    ).toThrow(/OUTBOX/);
+    expect(() =>
+      loadEnv({ ...prod, ...PROD_KEYS, OUTBOX_CURRENT_KEY_ID: "k2" }),
+    ).toThrow(/OUTBOX/);
+  });
+
+  it("chave malformada (tamanho errado, base64 inválido, id duplicado) => erro sem vazar o valor", () => {
+    for (const keys of [
+      "k1:curta",
+      `k1:${Buffer.alloc(16).toString("base64")}`,
+      `k1:${KEY_B64},k1:${KEY_B64}`,
+      "semdoispontos",
+      `k1:${KEY_B64}:extra`,
+    ]) {
+      const run = () =>
+        loadEnv({
+          ...prod,
+          OUTBOX_ENCRYPTION_KEYS: keys,
+          OUTBOX_CURRENT_KEY_ID: "k1",
+        });
+      expect(run).toThrow(/OUTBOX_ENCRYPTION_KEYS/);
+      expect(run).not.toThrow(new RegExp(KEY_B64.slice(0, 12)));
+    }
+  });
+
+  it("aceita várias chaves (rotação) com uma corrente; em dev há uma chave fixa", () => {
+    const k2 = Buffer.alloc(32, 6).toString("base64");
+    const env = loadEnv({
+      ...prod,
+      OUTBOX_ENCRYPTION_KEYS: `k1:${KEY_B64},k2:${k2}`,
+      OUTBOX_CURRENT_KEY_ID: "k2",
+    });
+    expect(env.OUTBOX_KEYRING.currentId).toBe("k2");
+    expect(env.OUTBOX_KEYRING.get("k1")).toBeDefined();
+    expect(loadEnv(valid).OUTBOX_KEYRING.currentId).toBe("dev");
+  });
+
+  it("APP_BASE_URL: padrão é a 1ª origem permitida; inválida é rejeitada", () => {
+    expect(loadEnv(valid).APP_BASE_URL).toBe("http://localhost:5173");
+    expect(
+      loadEnv({ ...valid, APP_BASE_URL: "https://app.exemplo.com/x" })
+        .APP_BASE_URL,
+    ).toBe("https://app.exemplo.com");
+    expect(() => loadEnv({ ...valid, APP_BASE_URL: "nao-url" })).toThrow(
+      /APP_BASE_URL/,
     );
   });
 });

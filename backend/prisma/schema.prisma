@@ -114,3 +114,50 @@ model AuthToken {
   @@index([expiresAt])
   @@map("auth_tokens")
 }
+
+// --- Etapa 5: outbox transacional de e-mail (3.6). Tabela global (sem organization_id). ---
+
+enum EmailTemplate {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+  PASSWORD_CHANGED
+  ACCOUNT_EXISTS
+}
+
+enum EmailOutboxStatus {
+  PENDING
+  SENDING
+  SENT
+  DEAD
+}
+
+enum EmailDeadReason {
+  MAX_ATTEMPTS
+  EXPIRED
+  PERMANENT_ERROR
+  KEY_UNAVAILABLE
+  DECRYPT_FAILED
+}
+
+model EmailOutbox {
+  id               String            @id @default(uuid(7)) @db.Uuid
+  toEmail          String            @map("to_email")
+  template         EmailTemplate
+  // AES-256-GCM: iv(12) | tag(16) | texto cifrado. NULL depois de SENT/DEAD (CHECK email_outbox_payload_lifecycle).
+  payloadEncrypted Bytes?            @map("payload_encrypted")
+  keyId            String?           @map("key_id")
+  status           EmailOutboxStatus @default(PENDING)
+  deadReason       EmailDeadReason?  @map("dead_reason")
+  attempts         Int               @default(0)
+  nextAttemptAt    DateTime          @map("next_attempt_at") @db.Timestamptz(3)
+  lockedUntil      DateTime?         @map("locked_until") @db.Timestamptz(3)
+  lockToken        String?           @map("lock_token") @db.Uuid
+  notAfter         DateTime          @map("not_after") @db.Timestamptz(3)
+  lastError        String?           @map("last_error")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentAt           DateTime?         @map("sent_at") @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+  @@index([status, lockedUntil])
+  @@map("email_outbox")
+}

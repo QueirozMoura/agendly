@@ -134,10 +134,17 @@ export function formatErrorForLog(
 }
 
 export function buildLoggerOptions(
-  env: { LOG_LEVEL: string; DATABASE_URL?: string | undefined },
+  env: {
+    LOG_LEVEL: string;
+    DATABASE_URL?: string | undefined;
+    OUTBOX_KEYRING?: { secrets(): string[] } | undefined;
+  },
   stream?: NodeJS.WritableStream,
 ): NonNullable<FastifyServerOptions["logger"]> {
-  const secrets = collectSecrets(env);
+  const secrets = [
+    ...collectSecrets(env),
+    ...(env.OUTBOX_KEYRING?.secrets() ?? []),
+  ];
   return {
     level: env.LOG_LEVEL,
     redact: { paths: REDACT_PATHS, censor: CENSOR },
