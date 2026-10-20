@@ -8,6 +8,7 @@ const OWNER_ACTIONS = [
   "org.view",
   "org.settings.update",
   "org.public_page.publish",
+  "org.public_page.unpublish",
   "services.create",
   "services.update",
   "services.toggle",

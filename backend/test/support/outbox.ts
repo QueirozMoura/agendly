@@ -42,6 +42,7 @@ export class RecordingLogger {
 export class ScriptedSender implements EmailSender {
   readonly calls: EmailMessage[] = [];
   readonly signals: AbortSignal[] = [];
+  readonly keys: (string | undefined)[] = [];
   behavior: (
     n: number,
     message: EmailMessage,
@@ -49,8 +50,12 @@ export class ScriptedSender implements EmailSender {
   ) => Promise<void> = async () => {};
   async send(
     message: EmailMessage,
-    { signal }: { signal: AbortSignal },
+    {
+      signal,
+      idempotencyKey,
+    }: { signal: AbortSignal; idempotencyKey?: string },
   ): Promise<void> {
+    this.keys.push(idempotencyKey);
     this.calls.push(message);
     this.signals.push(signal);
     await this.behavior(this.calls.length, message, signal);

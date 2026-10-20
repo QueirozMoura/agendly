@@ -706,7 +706,7 @@ describe("regressão dos fluxos de autenticação com a empresa ativa", () => {
   });
 });
 
-describe("verificação de e-mail temporariamente dispensada (REQUIRE_EMAIL_VERIFICATION=false)", () => {
+describe("verificação de e-mail dispensada explicitamente fora de produção (REQUIRE_EMAIL_VERIFICATION=false)", () => {
   let lax: AuthTestApp;
   beforeEach(async () => {
     lax = await makeAuthApp({ requireEmailVerification: false });

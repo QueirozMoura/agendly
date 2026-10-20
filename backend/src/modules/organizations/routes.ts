@@ -23,7 +23,7 @@ import {
 export interface OrganizationRoutesOptions {
   prisma: PrismaClient;
   secureCookies: boolean;
-  /** R10: exigir e-mail verificado para criar empresa. Desligável só por configuração do servidor (temporário). */
+  /** R10: exigir e-mail verificado para criar empresa. Dispensável só por configuração do servidor, fora de produção. */
   requireEmailVerification: boolean;
 }
 
@@ -63,7 +63,7 @@ export async function organizationRoutes(
     }
   });
 
-  // --- Criar empresa (exige e-mail verificado: R10, salvo REQUIRE_EMAIL_VERIFICATION=false, temporário) ---
+  // --- Criar empresa (exige e-mail verificado: R10, salvo REQUIRE_EMAIL_VERIFICATION=false, só fora de produção) ---
   app.post(
     "/api/organizations",
     { preHandler: authenticate, config: USER_SCOPED },

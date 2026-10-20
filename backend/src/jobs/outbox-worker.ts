@@ -127,7 +127,10 @@ async function processRow(
     const timeout = timeoutAfter(cfg.sendTimeoutMs, controller);
     try {
       await Promise.race([
-        deps.sender.send(message, { signal: controller.signal }),
+        deps.sender.send(message, {
+          signal: controller.signal,
+          idempotencyKey: row.id, // estável: a mesma mensagem usa a mesma chave em toda tentativa
+        }),
         timeout.promise,
       ]);
     } finally {
@@ -158,7 +161,15 @@ async function handleSendFailure(
       return await finishDead(deps, row, "MAX_ATTEMPTS", lastError);
     }
     const now = deps.clock.now();
-    const delay = backoffMs(row.attempts, cfg, deps.random ?? Math.random);
+    // Retry-After do provedor vale se for maior que o backoff, limitado ao teto operacional (backoffMaxMs).
+    const asked =
+      err instanceof EmailSendError && err.retryAfterMs !== undefined
+        ? Math.min(err.retryAfterMs, cfg.backoffMaxMs)
+        : 0;
+    const delay = Math.max(
+      backoffMs(row.attempts, cfg, deps.random ?? Math.random),
+      asked,
+    );
     const { count } = await deps.prisma.emailOutbox.updateMany({
       where: { id: row.id, lockToken: row.lockToken },
       data: {

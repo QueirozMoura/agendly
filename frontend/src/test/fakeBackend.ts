@@ -50,6 +50,7 @@ export const ANA: ApiUser = {
   email: "ana@example.com",
   name: "Ana",
   emailVerified: true,
+  emailVerificationRequired: true,
 };
 
 export function makeState(over: Partial<FakeState> = {}): FakeState {
@@ -228,7 +229,7 @@ export function fakeBackend(state: FakeState) {
     }),
     route("post", "/api/organizations", ({ body }) => {
       if (!state.user) return unauthorized();
-      if (!state.user.emailVerified)
+      if (state.user.emailVerificationRequired && !state.user.emailVerified)
         return error(
           403,
           "EMAIL_NOT_VERIFIED",

@@ -34,6 +34,7 @@ describe("POST /api/auth/login", () => {
       email: "ana@example.com",
       name: "Ana",
       emailVerified: false,
+      emailVerificationRequired: true,
     });
     expect(JSON.stringify(res.json())).not.toMatch(/hash|argon2|password/i);
     expect(res.headers["cache-control"]).toBe("no-store");

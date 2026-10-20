@@ -5,6 +5,8 @@ export interface ApiUser {
   email: string;
   name: string;
   emailVerified: boolean;
+  /** Regra efetiva da API: `false` só em desenvolvimento, quando o servidor dispensa a confirmação. */
+  emailVerificationRequired: boolean;
 }
 
 export interface ApiOrganization {

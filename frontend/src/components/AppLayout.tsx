@@ -102,7 +102,9 @@ export function AppLayout() {
         {switchError && <Alert kind="error">{switchError}</Alert>}
         {user && !user.emailVerified && (
           <Alert kind="info">
-            Confirme seu e-mail para criar empresas e publicar sua página.{" "}
+            {user.emailVerificationRequired
+              ? "Confirme seu e-mail para criar empresas."
+              : "Seu e-mail ainda não foi confirmado. Neste ambiente de desenvolvimento a confirmação não é exigida."}{" "}
             <button
               type="button"
               className="link-button"

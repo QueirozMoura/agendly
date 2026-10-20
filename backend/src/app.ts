@@ -31,8 +31,8 @@ export interface AuthOptions {
   /** true em produção: cookie Secure com prefixo __Host-. */
   secureCookies: boolean;
   /**
-   * Exigir e-mail verificado para criar empresa (R10). Omitido = exigido (padrão seguro). TEMPORARIAMENTE `false` em
-   * desenvolvimento via REQUIRE_EMAIL_VERIFICATION (config do servidor, nunca do cliente).
+   * Exigir e-mail verificado para criar empresa (R10). Omitido = exigido (padrão seguro). `false` só fora de produção,
+   * via REQUIRE_EMAIL_VERIFICATION (config do servidor, nunca do cliente); com `secureCookies` (produção) é recusado.
    */
   requireEmailVerification?: boolean;
 }
@@ -40,8 +40,11 @@ export interface AuthOptions {
 export interface AppOptions extends HealthDeps {
   logger: FastifyServerOptions["logger"];
   clock?: Clock;
-  /** Só com TRUST_PROXY=true (atrás de proxy reverso): req.ip passa a vir de X-Forwarded-For. */
-  trustProxy?: boolean;
+  /**
+   * Proxies confiáveis (ver TRUST_PROXY em config/env.ts): nº de saltos ou lista de IPs/CIDRs. NUNCA `true`: confiaria
+   * em qualquer X-Forwarded-For e deixaria o cliente forjar o IP (e fugir do rate limit).
+   */
+  trustProxy?: false | number | string[];
   /** Sem isto, nenhuma rota de autenticação (nem a proteção CSRF) é registrada. */
   auth?: AuthOptions;
 }
@@ -52,13 +55,25 @@ declare module "fastify" {
   }
 }
 
+/**
+ * Número de saltos ⇒ função de confiança (os tipos do Fastify não aceitam `number`, embora o runtime aceite): confia nos
+ * `n` primeiros saltos a partir da conexão (índice 0 = o proxy mais próximo) e lê o IP do cliente da DIREITA do
+ * X-Forwarded-For, então entradas forjadas pelo cliente à esquerda são ignoradas.
+ */
+export function toFastifyTrustProxy(
+  value: AppOptions["trustProxy"],
+): boolean | string[] | ((address: string, hop: number) => boolean) {
+  if (typeof value === "number") return (_address, hop) => hop < value;
+  return value ?? false;
+}
+
 export function buildApp(options: AppOptions): FastifyInstance {
   const app = Fastify({
     logger: options.logger ?? false,
     // O id é sempre gerado aqui: um x-request-id enviado pelo cliente não é confiável.
     genReqId: () => randomUUID(),
     requestIdLogLabel: "requestId",
-    trustProxy: options.trustProxy ?? false,
+    trustProxy: toFastifyTrustProxy(options.trustProxy),
     bodyLimit: 16 * 1024, // todos os corpos da API são pequenos JSONs; limita abuso de memória
   });
 
@@ -75,6 +90,10 @@ export function buildApp(options: AppOptions): FastifyInstance {
     const { prisma, keyring, allowedOrigins, secureCookies } = options.auth;
     const requireEmailVerification =
       options.auth.requireEmailVerification ?? true;
+    if (secureCookies && !requireEmailVerification)
+      throw new Error(
+        "A verificação de e-mail não pode ser dispensada em produção.",
+      );
     registerCsrfProtection(app, allowedOrigins);
     app.register(cookie);
     app.register(rateLimit, { global: false }); // limites aplicados por rota (createRateLimit)
@@ -91,6 +110,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     app.register(authRoutes, {
       prisma,
       secureCookies,
+      requireEmailVerification,
       outbox: { keyring, clock: app.clock },
     });
   }

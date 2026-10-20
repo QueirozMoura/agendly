@@ -13,6 +13,11 @@ com clientes por meio do WhatsApp.
 - `backend/`: API e regras de negócio.
 - `docs/`: documentação técnica e planejamento.
 
+## Configuração
+
+Variáveis do backend (`NODE_ENV` obrigatório, `TRUST_PROXY`, produção): [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) e `.env.example`.
+Desenvolvimento: `npm run dev -w backend`.
+
 ## Status
 
 Em fase inicial de desenvolvimento.

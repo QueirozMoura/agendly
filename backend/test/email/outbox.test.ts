@@ -78,6 +78,57 @@ describe("envio e retentativas", () => {
     expect(h.sender.calls).toHaveLength(4);
   });
 
+  it("M2: o Idempotency-Key é o id da mensagem e não muda entre tentativas; mensagens diferentes têm chaves diferentes", async () => {
+    const a = await h.enqueue("RESET_PASSWORD", { token: TOKEN });
+    const b = await h.enqueue("VERIFY_EMAIL", { name: "Ana", token: TOKEN });
+    h.sender.behavior = async (n) => {
+      if (n <= 4) throw new Error("5xx");
+    };
+    for (let i = 0; i < 4; i++) {
+      await runOutboxCycle(h.deps);
+      h.clock.advance(20 * 60_000);
+    }
+    const byRow = h.sender.keys.filter((k) => k === a).length;
+    expect(byRow).toBeGreaterThanOrEqual(2); // reenviada com a mesma chave
+    expect(new Set(h.sender.keys)).toEqual(new Set([a, b]));
+    expect(
+      h.sender.keys.every((k) => typeof k === "string" && k.length <= 256),
+    ).toBe(true);
+  });
+
+  it("L2: Retry-After do provedor maior que o backoff é respeitado, mas limitado ao teto operacional", async () => {
+    const id = await h.enqueue("RESET_PASSWORD", { token: TOKEN });
+    h.sender.behavior = async () => {
+      throw new EmailSendError("429", false, 5 * 60_000);
+    };
+    await runOutboxCycle(h.deps);
+    let r = await row(id);
+    expect(r.nextAttemptAt.getTime() - h.clock.now().getTime()).toBe(
+      5 * 60_000,
+    ); // > backoff de 30 s
+
+    const id2 = await h.enqueue("RESET_PASSWORD", { token: TOKEN });
+    h.sender.behavior = async () => {
+      throw new EmailSendError("429", false, 24 * 60 * 60_000);
+    };
+    h.clock.advance(6 * 60_000);
+    await runOutboxCycle(h.deps);
+    r = await row(id2);
+    expect(r.nextAttemptAt.getTime() - h.clock.now().getTime()).toBe(
+      DEFAULT_OUTBOX_CONFIG.backoffMaxMs,
+    );
+  });
+
+  it("L2: Retry-After menor que o backoff não encurta a espera", async () => {
+    const id = await h.enqueue("RESET_PASSWORD", { token: TOKEN });
+    h.sender.behavior = async () => {
+      throw new EmailSendError("429", false, 1000);
+    };
+    await runOutboxCycle(h.deps);
+    const r = await row(id);
+    expect(r.nextAttemptAt.getTime() - h.clock.now().getTime()).toBe(30_000);
+  });
+
   it("não reenvia antes de next_attempt_at", async () => {
     await h.enqueue("RESET_PASSWORD", { token: TOKEN });
     h.sender.behavior = async () => {

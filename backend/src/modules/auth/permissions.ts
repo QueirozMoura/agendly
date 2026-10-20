@@ -10,7 +10,8 @@ const MATRIX: Readonly<Record<Role, readonly string[]>> = {
     "account.*", // ver/encerrar sessões, sair de todos os dispositivos
     "org.view",
     "org.settings.update", // nome, slug e limites da página pública (timezone é imutável: não é uma ação)
-    "org.public_page.publish", // exige e-mail verificado (verificado também no servidor)
+    "org.public_page.publish", // exige e-mail verificado SEMPRE, no servidor (auth/email-policy.ts)
+    "org.public_page.unpublish", // nunca exige e-mail verificado: retirar a página do ar é sempre possível
     "services.*",
     "professionals.*",
     "availability.*",

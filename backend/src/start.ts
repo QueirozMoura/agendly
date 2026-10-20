@@ -7,7 +7,13 @@ import {
   type JobsHandle,
 } from "./jobs/index.ts";
 import { createDatabase, type Database } from "./lib/db/database.ts";
-import { ConsoleEmailSender, type EmailSender } from "./lib/email/sender.ts";
+import {
+  ConsoleEmailSender,
+  ResendEmailSender,
+  checkResendConfig,
+  type EmailSender,
+  type ProviderCheck,
+} from "./lib/email/sender.ts";
 import {
   buildLoggerOptions,
   collectSecrets,
@@ -18,8 +24,15 @@ import { systemClock } from "./lib/time/clock.ts";
 export interface StartDeps {
   createDatabase?: (url: string) => Database;
   buildApp?: (options: AppOptions) => FastifyInstance;
-  /** Provedor de e-mail. Padrão: console (só desenvolvimento); produção exige um provedor real (V10). */
+  /** Provedor de e-mail. Padrão: Resend se configurado; senão console (só fora de produção). */
   sender?: EmailSender;
+  /** Confere chave e domínio do remetente no Resend na subida em produção. Substituível em testes. */
+  checkEmailProvider?: (config: {
+    apiKey: string;
+    from: string;
+  }) => Promise<ProviderCheck>;
+  /** Avisos operacionais da subida (ex.: verificação do provedor inconclusiva). */
+  logWarn?: (message: string) => void;
   /** Inicia os laços de fundo (outbox e manutenção). Substituível em testes. */
   startJobs?: (deps: BackgroundJobsDeps) => JobsHandle;
   /** Erros secundários (ex.: falha ao fechar recursos depois de uma falha de inicialização). */
@@ -57,12 +70,11 @@ async function closeAll(
 
 function pickSender(env: Env, injected: EmailSender | undefined): EmailSender {
   if (injected) return injected;
+  // loadEnv garante o provedor em produção; sem ele (só fora de produção) o e-mail vai para o console.
+  if (env.EMAIL_PROVIDER) return new ResendEmailSender(env.EMAIL_PROVIDER);
   if (env.NODE_ENV === "production") {
-    // O provedor real é escolhido e verificado nas etapas 5 (escolha) e 16 (V10). Falhar na subida é melhor
-    // do que "enviar" para o console e perder e-mails de verificação e recuperação em silêncio.
-    throw new Error(
-      "Nenhum provedor de e-mail configurado para produção (V10).",
-    );
+    // Defesa em profundidade: nunca "enviar" para o console em produção e perder verificação/recuperação em silêncio.
+    throw new Error("Nenhum provedor de e-mail configurado para produção.");
   }
   return new ConsoleEmailSender();
 }
@@ -71,11 +83,30 @@ export async function startServer(
   env: Env,
   deps: StartDeps = {},
 ): Promise<RunningServer> {
-  const secrets = [...collectSecrets(env), ...env.OUTBOX_KEYRING.secrets()];
+  const secrets = [
+    ...collectSecrets(env),
+    ...env.OUTBOX_KEYRING.secrets(),
+    ...(env.EMAIL_PROVIDER ? [env.EMAIL_PROVIDER.apiKey] : []),
+  ];
   const logError =
     deps.logError ??
     ((err, msg) => console.error(formatErrorForLog(err, msg, secrets)));
   const sender = pickSender(env, deps.sender);
+  // Produção com o Resend real: erro DEFINITIVO de configuração (chave recusada, domínio não verificado) impede a subida,
+  // antes de aceitar cadastros que dependem de e-mail. Instabilidade do provedor só gera aviso.
+  if (env.NODE_ENV === "production" && env.EMAIL_PROVIDER && !deps.sender) {
+    const check = await (deps.checkEmailProvider ?? checkResendConfig)(
+      env.EMAIL_PROVIDER,
+    );
+    if (check.status === "invalid")
+      throw new Error(
+        `Configuração do provedor de e-mail inválida: ${check.reason}`,
+      );
+    if (check.status === "inconclusive")
+      (deps.logWarn ?? console.warn)(
+        `Provedor de e-mail não verificado na subida: ${check.reason}. A entrega NÃO foi confirmada.`,
+      );
+  }
   const db = (deps.createDatabase ?? createDatabase)(env.DATABASE_URL);
   let app: FastifyInstance | undefined;
   let jobs: JobsHandle | undefined;

@@ -576,4 +576,53 @@ describe("sessão", () => {
     expect(within(banner).getByText(/Confirme seu e-mail/)).toBeInTheDocument();
     expect(calls(state, "/api/auth/resend-verification")).toHaveLength(1);
   });
+
+  it("faixa de e-mail não confirmado: exigência real, sem prometer a publicação da página", async () => {
+    const state = makeState({
+      user: { ...ANA, emailVerified: false },
+      organizations: [makeOrg("salao", "Salão da Ana")],
+      activeSlug: "salao",
+    });
+    renderApp(state, { route: "/" });
+    const banner = (await screen.findByText(/Confirme seu e-mail/)).closest(
+      "[role='status']",
+    ) as HTMLElement;
+    expect(banner).toHaveTextContent(
+      "Confirme seu e-mail para criar empresas.",
+    );
+    expect(banner).not.toHaveTextContent(/publicar/);
+  });
+
+  it("servidor que dispensa a confirmação (só desenvolvimento): a faixa não diz que é necessária", async () => {
+    const state = makeState({
+      user: { ...ANA, emailVerified: false, emailVerificationRequired: false },
+      organizations: [makeOrg("salao", "Salão da Ana")],
+      activeSlug: "salao",
+    });
+    renderApp(state, { route: "/" });
+    const banner = (await screen.findByText(/não foi confirmado/)).closest(
+      "[role='status']",
+    ) as HTMLElement;
+    expect(banner).toHaveTextContent("a confirmação não é exigida");
+    expect(banner).not.toHaveTextContent(/Confirme seu e-mail/);
+    expect(
+      within(banner).getByRole("button", {
+        name: "Reenviar e-mail de confirmação",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("e-mail confirmado: nenhuma faixa", async () => {
+    const state = makeState({
+      user: ANA,
+      organizations: [makeOrg("salao", "Salão da Ana")],
+      activeSlug: "salao",
+    });
+    renderApp(state, { route: "/" });
+    await screen.findByRole("heading", { name: "Salão da Ana" });
+    expect(
+      screen.queryByText(/Confirme seu e-mail|não foi confirmado/),
+    ).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
 });

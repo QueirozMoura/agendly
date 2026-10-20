@@ -47,6 +47,7 @@ describe("GET /api/me", () => {
         email: "ana@example.com",
         name: "Ana",
         emailVerified: false,
+        emailVerificationRequired: true,
       },
     });
     expect(res.headers["cache-control"]).toBe("no-store");

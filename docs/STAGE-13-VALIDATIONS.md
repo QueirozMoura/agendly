@@ -2,8 +2,8 @@
 
 > Status: **para revisão humana.** O `docs/ARCHITECTURE.md` **não** foi alterado. Sem commit e sem push.
 > Conferido antes de começar: branch `main` em `5d2b649` = `origin/main`, árvore limpa.
-> **Validação manual no navegador com o backend real: NÃO executada.** O roteiro da seção 5 está apenas documentado.
-> O que foi executado está na seção 4 (testes automatizados e verificações estáticas).
+> **Validação manual com o backend real:** executada em 20/10/2026 (seção 5.1: 15 dos 16 cenários, 3 deles com ressalvas; o cenário 1 ficou sem execução manual).
+> Seção 4: testes automatizados e verificações estáticas. O roteiro da seção 5 continua sendo a referência para repetir.
 
 ## 1. Escopo (seção 11 do plano)
 
@@ -105,6 +105,31 @@ Pré-requisitos: Postgres e migrations aplicadas; backend e `npm run dev -w fron
 | 14 | Fuso | Comparar um agendamento criado para 10:00 da empresa com o fuso do sistema operacional diferente. | O cartão mostra 10:00 do fuso da **empresa**, não do navegador. Testar também uma data de transição de horário de verão (empresa em Nova York, 09/03/2031). |
 | 15 | Isolamento | Trocar para a empresa B pelo seletor. Em outra aba, ainda na A, fazer uma requisição depois da troca. | A agenda de B não mostra dados de A; uma aba desatualizada recebe `409 ACTIVE_ORG_CHANGED` e recarrega; um `id` de agendamento de A usado pela empresa B responde 404. |
 | 16 | Celular | Largura de ~375 px. | Sem rolagem horizontal da página; semana em uma coluna; formulários utilizáveis. |
+
+### 5.1 Execução manual de 20/10/2026 (backend real + Vite + Chrome) — resultados observados
+
+Ambiente: backend (`NODE_ENV=development`) e frontend Vite locais, banco **descartável** criado só para isto (já removido; o banco de desenvolvimento não foi tocado), conta de teste e duas empresas (A: `America/New_York`; B: `America/Sao_Paulo`; navegador em `America/Sao_Paulo`). Os dados iniciais (conta, empresas, serviços, profissionais, expediente) foram criados pela API do próprio app; os cenários abaixo foram exercitados pela interface, e as ações de uma "segunda janela/sessão" foram simuladas por chamadas à API na mesma sessão do navegador.
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Acesso sem sessão | **Não verificado nesta execução** (coberto só pelo teste automatizado) |
+| 2 | Empresa ativa | **Aprovado**: a agenda mostra "Horários na hora local da empresa (America/New_York)". O banner de e-mail apareceu; na época o texto não refletia a regra efetiva da API (prometia "publicar sua página"). Texto e regra foram corrigidos depois, no item 3 (ver `docs/EMAIL-VERIFICATION.md`) |
+| 3 | Visão diária | **Aprovado**: dia local correto; `from`/`to` do dia em UTC (25 h em 01/11/2026, fim do horário de verão) |
+| 4 | Visão semanal | **Aprovado**: segunda a domingo (19–25/10), um bloco por profissional e dia, 7 dias consultados; Próximo/Anterior/Hoje andam 7 dias |
+| 5 | Criar | **Aprovado**: horários reais da API (08:00 em Nova York, não no fuso do navegador), 10:00 ⇒ `2026-10-20T14:00Z`, `201`, aviso, cartão 10:00–10:30 com 30 min + 10 min e R$ 50,50 |
+| 6 | Validações | **Aprovado**: 5 mensagens locais com o formulário vazio; telefone `12` ⇒ `400` do servidor exibido no campo, dados mantidos |
+| 7 | Idempotência | **Aprovado com ressalva**: a perda de resposta foi simulada no navegador (o servidor gravou e o app viu erro de rede; não foi o DevTools offline). O reenvio usou a **mesma `Idempotency-Key` e o mesmo corpo**, o servidor respondeu `201` com `Idempotent-Replay: true` e existe **um** agendamento |
+| 8 | Concorrência de horário | **Aprovado**: outra "janela" ocupou o horário; o envio recebeu `409`, aviso exibido, nome/telefone/e-mail/profissional/serviço mantidos, 12:00 sumiu da lista, nenhum horário marcado |
+| 9 | Remarcar | **Aprovado**: `POST …/reschedule` com `startsAt` e `version`, `200`, cartão no novo horário. Observado: o próprio horário atual não é oferecido (limitação conhecida) |
+| 10 | Versão desatualizada | **Aprovado** para remarcar e cancelar: `409`; a alteração da outra sessão foi preservada no servidor; a tela avisou, recarregou e fechou o editor |
+| 11 | Cancelar | **Aprovado**: nada enviado antes de confirmar; `{version, reason}`, `200`, cartão "Cancelado" com motivo e sem botões, nenhum `DELETE` |
+| 12 | Sessão expirada | **Aprovado com ressalva**: após encerrar a sessão e clicar em Atualizar, volta ao login com "Sua sessão terminou." e sem erro cru. Ao entrar de novo o usuário caiu em `/empresas`, **não** em `/agenda`: a nova sessão não tem empresa ativa. O roteiro esperava voltar a `/agenda`; não confirmei se o destino chegou a ser aplicado antes do redirecionamento por falta de empresa |
+| 13 | Passado | **Aprovado**: campo com `min` = hoje; data passada não consulta horários nem envia; o servidor real respondeu `422 STARTS_AT_IN_PAST` a um `startsAt` passado. O bloqueio de "horário vencido durante a tela aberta" não foi exercitado (só no teste automatizado) |
+| 14 | Fuso | **Aprovado**: empresa em Nova York com navegador em São Paulo mostra os horários de Nova York; semana de 26/10–01/11 e dia 01/11 com os limites UTC corretos |
+| 15 | Isolamento | **Aprovado**: com a empresa B ativa, a lista da A vem vazia; `GET`/`cancel`/`reschedule` de um id da A ⇒ `404`; criar e consultar slots com profissional da A ⇒ `404`; `X-Active-Org: salao-a` com B ativa ⇒ `409 ACTIVE_ORG_CHANGED`; `organizationId` no corpo ⇒ `400`; a A permaneceu intacta |
+| 16 | Celular | **Aprovado com ressalva**: a janela do Chrome não pôde ser redimensionada; foi medido um iframe de 375 px (mesma origem): sem rolagem horizontal, semana em 1 coluna, formulário sem elementos além da largura. Não é um aparelho real |
+
+Não executados: cenário 1 e o bloqueio de horário vencido (13); captura de tela do celular. O resultado completo dos testes automatizados continua na seção 4.
 
 ## 6. Limitações, riscos e cenários não cobertos
 

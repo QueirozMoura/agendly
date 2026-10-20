@@ -315,10 +315,18 @@ describe("provedor de e-mail em produção", () => {
       NODE_ENV: "production",
       DATABASE_URL: "postgresql://u:p@localhost:5432/db",
       ALLOWED_ORIGINS: "https://app.exemplo.com",
+      TRUST_PROXY: "false",
       OUTBOX_ENCRYPTION_KEYS: `k1:${Buffer.alloc(32, 5).toString("base64")}`,
       OUTBOX_CURRENT_KEY_ID: "k1",
+      RESEND_API_KEY: "re_chave_de_teste_nao_real",
+      EMAIL_FROM: "Agendly <no-reply@example.com>",
     });
-    const err = await startServer({ ...env, PORT: 0 }).catch((e) => e);
+    // loadEnv já recusa produção sem provedor (env.test.ts); aqui força o estado impossível para provar a defesa do start.
+    const err = await startServer({
+      ...env,
+      EMAIL_PROVIDER: undefined,
+      PORT: 0,
+    }).catch((e) => e);
     expect(String(err.message)).toContain("provedor de e-mail");
     expect(String(err.message)).not.toContain(
       Buffer.alloc(32, 5).toString("base64"),

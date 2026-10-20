@@ -44,6 +44,8 @@ export async function makeAuthApp(
   opts: {
     secureCookies?: boolean;
     requireEmailVerification?: boolean;
+    /** Proxies confiáveis (nº de saltos ou lista); padrão: nenhum. */
+    trustProxy?: number | string[];
     databaseUrlOverride?: string;
     /** Devolve o cliente que a API usa (ex.: com `$extends` para injetar falhas e barreiras). */
     wrapPrisma?: (prisma: PrismaClient) => PrismaClient;
@@ -78,6 +80,7 @@ export async function makeAuthApp(
       stream,
     ),
     clock,
+    ...(opts.trustProxy === undefined ? {} : { trustProxy: opts.trustProxy }),
     checkDatabase: async () => {},
     auth: {
       prisma: opts.wrapPrisma ? opts.wrapPrisma(prisma) : prisma,

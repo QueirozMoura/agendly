@@ -138,12 +138,14 @@ export function buildLoggerOptions(
     LOG_LEVEL: string;
     DATABASE_URL?: string | undefined;
     OUTBOX_KEYRING?: { secrets(): string[] } | undefined;
+    EMAIL_PROVIDER?: { apiKey: string } | undefined;
   },
   stream?: NodeJS.WritableStream,
 ): NonNullable<FastifyServerOptions["logger"]> {
   const secrets = [
     ...collectSecrets(env),
     ...(env.OUTBOX_KEYRING?.secrets() ?? []),
+    ...(env.EMAIL_PROVIDER ? [env.EMAIL_PROVIDER.apiKey] : []),
   ];
   return {
     level: env.LOG_LEVEL,

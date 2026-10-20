@@ -39,6 +39,8 @@ import {
 export interface AuthRoutesOptions {
   prisma: PrismaClient;
   secureCookies: boolean;
+  /** Só informativo para a SPA (`emailVerificationRequired`); quem impõe a regra é a rota que a exige. */
+  requireEmailVerification: boolean;
   outbox: OutboxContext;
 }
 
@@ -76,7 +78,7 @@ export async function authRoutes(
   app: FastifyInstance,
   opts: AuthRoutesOptions,
 ): Promise<void> {
-  const { prisma, secureCookies } = opts;
+  const { prisma, secureCookies, requireEmailVerification } = opts;
   const authenticate = makeAuthenticate(app, { prisma, secureCookies });
   const account: AccountDeps = { prisma, outbox: opts.outbox };
   const cookieName = sessionCookieName(secureCookies);
@@ -206,7 +208,7 @@ export async function authRoutes(
         userAgent: request.headers["user-agent"],
       });
       setSessionCookie(reply, secureCookies, token);
-      return reply.send({ user: publicUser(user) });
+      return reply.send({ user: publicUser(user, requireEmailVerification) });
     },
   );
 
@@ -301,21 +303,31 @@ export async function authRoutes(
     "/api/me",
     { preHandler: authenticate, config: AUTH_ROUTE },
     async (request) => {
-      return { user: publicUser((request.auth as AuthContext).user) };
+      return {
+        user: publicUser(
+          (request.auth as AuthContext).user,
+          requireEmailVerification,
+        ),
+      };
     },
   );
 }
 
-function publicUser(u: {
-  id: string;
-  email: string;
-  name: string;
-  emailVerifiedAt: Date | null;
-}) {
+function publicUser(
+  u: {
+    id: string;
+    email: string;
+    name: string;
+    emailVerifiedAt: Date | null;
+  },
+  requireEmailVerification: boolean,
+) {
   return {
     id: u.id,
     email: u.email,
     name: u.name,
     emailVerified: u.emailVerifiedAt !== null,
+    // Reflete a regra EFETIVA do servidor, para a interface não prometer nem negar o que a API não faz.
+    emailVerificationRequired: requireEmailVerification,
   };
 }
