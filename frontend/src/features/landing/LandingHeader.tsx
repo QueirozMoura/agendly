@@ -8,7 +8,7 @@ export interface LandingNavItem {
 }
 
 /**
- * Cabeçalho da página pública. `items` são âncoras para seções da própria página; enquanto as seções não existem a
+ * Cabeçalho da página pública. `items` são âncoras (no DOM o botão do menu vem antes da lista, para o foco entrar nos links ao abri-lo; a ordem visual é feita por CSS) para seções da própria página; enquanto as seções não existem a
  * lista fica vazia (Etapa 2) e nem a navegação nem o botão de menu aparecem, para não haver link morto.
  */
 export function LandingHeader({ items = [] }: { items?: LandingNavItem[] }) {
@@ -20,6 +20,20 @@ export function LandingHeader({ items = [] }: { items?: LandingNavItem[] }) {
         <Link to="/" className="landing-brand">
           Agendly
         </Link>
+        {hasNav && (
+          <button
+            type="button"
+            className="landing-menu"
+            aria-expanded={open}
+            aria-controls="landing-nav"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span className="visually-hidden">
+              {open ? "Fechar menu" : "Abrir menu"}
+            </span>
+            <span aria-hidden="true">{open ? "✕" : "☰"}</span>
+          </button>
+        )}
         {hasNav && (
           <nav
             id="landing-nav"
@@ -46,20 +60,6 @@ export function LandingHeader({ items = [] }: { items?: LandingNavItem[] }) {
             Começar agora
           </Link>
         </div>
-        {hasNav && (
-          <button
-            type="button"
-            className="landing-menu"
-            aria-expanded={open}
-            aria-controls="landing-nav"
-            onClick={() => setOpen((v) => !v)}
-          >
-            <span className="visually-hidden">
-              {open ? "Fechar menu" : "Abrir menu"}
-            </span>
-            <span aria-hidden="true">{open ? "✕" : "☰"}</span>
-          </button>
-        )}
       </div>
     </header>
   );

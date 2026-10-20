@@ -63,6 +63,22 @@ describe("LandingHeader", () => {
   });
 });
 
+describe("LandingHeader: ordem do foco", () => {
+  it("o botão do menu vem antes da navegação no DOM (ao abrir, o próximo Tab entra nos links)", async () => {
+    const user = userEvent.setup();
+    header(ITEMS);
+    const menu = screen.getByRole("button", { name: "Abrir menu" });
+    await user.click(menu);
+    menu.focus();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Benefícios" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "FAQ" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Entrar" })).toHaveFocus();
+  });
+});
+
 describe("landing.css", () => {
   const css = readFileSync(
     resolve(process.cwd(), "src/features/landing/landing.css"),

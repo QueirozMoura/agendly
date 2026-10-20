@@ -7,23 +7,29 @@ import { ANA, makeOrg, makeState } from "./fakeBackend";
 import { currentPath, renderApp } from "./render";
 
 const PASSWORD = "uma-senha-bem-longa-9X";
-const PUBLIC_TEXT = /Cadastre serviços e profissionais/;
+const PUBLIC_TEXT = /sem horários em conflito/;
 
 describe("portaria de /", () => {
   it("visitante anônimo vê o placeholder público, com os botões Entrar e Começar agora", async () => {
     const { container } = renderApp(makeState(), { route: "/" });
     expect(await screen.findByText(PUBLIC_TEXT)).toBeInTheDocument();
-    // header e hero oferecem os mesmos dois destinos
+    // header, hero, CTA final e rodapé oferecem os mesmos destinos
     for (const [name, href] of [
       ["Entrar", "/entrar"],
       ["Começar agora", "/cadastro"],
     ] as const) {
       const links = screen.getAllByRole("link", { name });
-      expect(links).toHaveLength(2);
+      expect(links.length).toBeGreaterThanOrEqual(2);
       for (const link of links) expect(link).toHaveAttribute("href", href);
     }
     expect(currentPath(container)).toBe("/");
-    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    // a navegação é a das seções da página pública, não a do painel
+    expect(
+      screen.getByRole("navigation", { name: "Seções" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Principal" }),
+    ).not.toBeInTheDocument();
   });
 
   it("sessão que terminou estando em / vai ao login com o aviso (não à página pública)", async () => {
