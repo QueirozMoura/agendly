@@ -65,7 +65,8 @@ describe("401 no meio da sessão", () => {
   });
 
   it("a consulta inicial /api/me sem sessão (401) NÃO é 'sessão terminada': o login abre sem aviso", async () => {
-    renderApp(makeState(), { route: "/" });
+    // "/" anônimo agora mostra a página pública; o redirecionamento ao login se verifica numa rota protegida.
+    renderApp(makeState(), { route: "/empresas" });
     expect(
       await screen.findByRole("heading", { name: "Entrar" }),
     ).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../features/auth/AuthContext";
+import { LandingPage } from "../features/landing/LandingPage";
 import { safeInternalPath } from "../features/auth/redirect";
 import { useOrganizations } from "../features/organizations/OrganizationContext";
 import { LoadError } from "./LoadError";
@@ -52,5 +53,20 @@ export function PublicOnly() {
         replace
       />
     );
+  return <Outlet />;
+}
+
+/**
+ * Portaria de "/": visitante anônimo vê a página pública; com sessão, segue para o painel de sempre (o `Outlet`).
+ * Só decide em "/" exato: nas demais rotas é transparente e quem protege continua sendo `RequireAuth`. Enquanto a
+ * sessão carrega mostra `Loading` (nunca o conteúdo público, para não piscar para quem já tem sessão).
+ */
+export function RootGate() {
+  const { status, sessionExpired } = useAuth();
+  const { pathname } = useLocation();
+  if (pathname !== "/") return <Outlet />;
+  if (status === "loading") return <Loading />;
+  // Sessão que existia e terminou não é "visitante": segue para o RequireAuth, que leva ao login com o aviso.
+  if (status === "anonymous" && !sessionExpired) return <LandingPage />;
   return <Outlet />;
 }

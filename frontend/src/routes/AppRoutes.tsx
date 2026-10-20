@@ -4,6 +4,7 @@ import {
   PublicOnly,
   RequireAuth,
   RequireOrganization,
+  RootGate,
 } from "../components/guards";
 import { PublicLayout } from "../components/PublicLayout";
 import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage";
@@ -32,18 +33,20 @@ export function AppRoutes() {
         <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
         <Route path="/verificar-email" element={<VerifyEmailPage />} />
       </Route>
-      <Route element={<RequireAuth />}>
-        <Route element={<AppLayout />}>
-          <Route path="/empresas" element={<OrganizationSelectPage />} />
-          <Route element={<RequireOrganization />}>
-            <Route index element={<HomePage />} />
-            <Route path="/agenda" element={<AgendaPage />} />
-            <Route path="/servicos" element={<ServicesPage />} />
-            <Route path="/profissionais" element={<ProfessionalsPage />} />
-            <Route
-              path="/profissionais/:id"
-              element={<ProfessionalDetailPage />}
-            />
+      <Route element={<RootGate />}>
+        <Route element={<RequireAuth />}>
+          <Route element={<AppLayout />}>
+            <Route path="/empresas" element={<OrganizationSelectPage />} />
+            <Route element={<RequireOrganization />}>
+              <Route index element={<HomePage />} />
+              <Route path="/agenda" element={<AgendaPage />} />
+              <Route path="/servicos" element={<ServicesPage />} />
+              <Route path="/profissionais" element={<ProfessionalsPage />} />
+              <Route
+                path="/profissionais/:id"
+                element={<ProfessionalDetailPage />}
+              />
+            </Route>
           </Route>
         </Route>
       </Route>

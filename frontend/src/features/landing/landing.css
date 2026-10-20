@@ -1,0 +1,356 @@
+/*
+ * Estilos da página pública. Tudo vive sob `.landing` / `.landing-*`: nenhum seletor global e nenhuma alteração nos
+ * tokens do painel (styles.css). Tema claro por padrão e escuro por `prefers-color-scheme`, como o resto do app.
+ */
+.landing {
+  color-scheme: light dark;
+  --l-bg: #f8faf9;
+  --l-surface: #ffffff;
+  --l-text: #14201f;
+  --l-muted: #4a5b59;
+  --l-border: #d3dedc;
+  --l-control-border: #6b8582; /* borda de botões: ≥ 3:1 sobre o fundo (WCAG 1.4.11) */
+  --l-accent: #0f766e; /* verde-petróleo */
+  --l-accent-hover: #0b5f58;
+  --l-accent-text: #ffffff;
+  --l-focus: #0f766e;
+  --l-header-bg: rgb(248 250 249 / 0.9);
+  --l-hero-glow: #e3f3f0;
+  --l-ok-bg: #dcf1ee;
+  --l-ok-text: #0b5f58;
+  --l-neutral-bg: #e9efee;
+  --l-neutral-text: #2f4a47;
+  --l-off-bg: #f6e6e6;
+  --l-off-text: #6b3a3a;
+  --l-shadow: 0 12px 32px rgb(15 118 110 / 0.14);
+  --l-radius: 10px;
+  --l-gutter: 1rem;
+
+  min-height: 100vh;
+  background: var(--l-bg);
+  color: var(--l-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  line-height: 1.55;
+}
+@media (prefers-color-scheme: dark) {
+  .landing {
+    --l-bg: #0d1716;
+    --l-surface: #14211f;
+    --l-text: #e6f0ee;
+    --l-muted: #a6b9b6;
+    --l-border: #2a3d3a;
+    --l-control-border: #5d7f7b;
+    --l-accent: #2dd4bf;
+    --l-accent-hover: #5eead4;
+    --l-accent-text: #04201c;
+    --l-focus: #5eead4;
+    --l-header-bg: rgb(13 23 22 / 0.9);
+    --l-hero-glow: #10302c;
+    --l-ok-bg: #12312d;
+    --l-ok-text: #5eead4;
+    --l-neutral-bg: #1d2f2c;
+    --l-neutral-text: #c3d3d0;
+    --l-off-bg: #3a2020;
+    --l-off-text: #f0b4b4;
+    --l-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  }
+}
+
+.landing :focus-visible {
+  outline: 3px solid var(--l-focus);
+  outline-offset: 2px;
+}
+
+/* Cabeçalho */
+.landing-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--l-header-bg);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--l-border);
+}
+.landing-header-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.75rem var(--l-gutter);
+}
+.landing-brand {
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--l-accent);
+}
+.landing-nav {
+  display: none;
+}
+.landing-nav a {
+  padding: 0.5rem 0.25rem;
+  text-decoration: none;
+  color: var(--l-muted);
+}
+.landing-nav a:hover {
+  color: var(--l-text);
+}
+.landing-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Botões */
+.landing-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--l-control-border);
+  border-radius: var(--l-radius);
+  background: var(--l-surface);
+  color: var(--l-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.landing-button:hover {
+  border-color: var(--l-accent);
+}
+.landing-primary {
+  background: var(--l-accent);
+  border-color: var(--l-accent);
+  color: var(--l-accent-text);
+}
+.landing-primary:hover {
+  background: var(--l-accent-hover);
+  border-color: var(--l-accent-hover);
+}
+
+/* Botão do menu (só existe quando há links de seção) */
+.landing-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--l-control-border);
+  border-radius: var(--l-radius);
+  background: var(--l-surface);
+  color: var(--l-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+/* Celular: o menu abre como painel sob a barra */
+.landing-nav[data-open="true"] {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 0.5rem var(--l-gutter) 1rem;
+  background: var(--l-bg);
+  border-bottom: 1px solid var(--l-border);
+}
+/* Telas estreitas: barra mais compacta para brand + 2 botões + menu caberem a 375 px */
+@media (max-width: 479px) {
+  .landing-header-bar {
+    gap: 0.5rem;
+  }
+  .landing-brand {
+    font-size: 1.1rem;
+  }
+  .landing-actions {
+    gap: 0.375rem;
+  }
+  .landing-button {
+    padding: 0 0.625rem;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 880px) {
+  .landing {
+    --l-gutter: 1.5rem;
+  }
+  .landing-nav,
+  .landing-nav[data-open="true"] {
+    display: flex;
+    flex-direction: row;
+    position: static;
+    padding: 0;
+    gap: 1.25rem;
+    background: none;
+    border: 0;
+    margin-left: 1rem;
+  }
+  .landing-menu {
+    display: none;
+  }
+}
+
+/* Hero */
+.landing-hero {
+  background: radial-gradient(
+    ellipse at 80% 0%,
+    var(--l-hero-glow),
+    transparent 60%
+  );
+}
+.landing-hero-inner {
+  display: grid;
+  gap: 2.5rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2.5rem var(--l-gutter) 3.5rem;
+}
+.landing-hero-copy h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 7vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+.landing-hero-copy h1 span {
+  color: var(--l-accent);
+}
+.landing-lead {
+  margin: 0 0 1.75rem;
+  max-width: 34rem;
+  font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+  color: var(--l-muted);
+}
+.landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.landing-large {
+  min-height: 3rem;
+  padding: 0 1.5rem;
+  font-size: 1.05rem;
+}
+
+/* Demonstração estática da agenda */
+.landing-preview {
+  margin: 0;
+  padding: 1rem;
+  background: var(--l-surface);
+  border: 1px solid var(--l-border);
+  border-radius: 14px;
+  box-shadow: var(--l-shadow);
+}
+.landing-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.landing-preview-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.landing-preview-segmented {
+  display: inline-flex;
+  border: 1px solid var(--l-control-border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.85rem;
+}
+.landing-preview-seg {
+  padding: 0.25rem 0.75rem;
+  color: var(--l-muted);
+}
+.landing-preview-seg.is-on {
+  background: var(--l-accent);
+  color: var(--l-accent-text);
+  font-weight: 600;
+}
+.landing-preview-pro {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--l-muted);
+}
+.landing-preview-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.landing-appt {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--l-border);
+  border-left: 4px solid var(--l-accent);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.landing-appt.is-scheduled {
+  border-left-color: var(--l-control-border);
+}
+.landing-appt.is-cancelled {
+  border-left-color: var(--l-off-text);
+  color: var(--l-muted);
+}
+.landing-appt.is-cancelled strong {
+  text-decoration: line-through;
+}
+.landing-appt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.landing-appt-detail {
+  font-size: 0.85rem;
+  color: var(--l-muted);
+}
+.landing-badge {
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.landing-appt.is-scheduled .landing-badge {
+  background: var(--l-neutral-bg);
+  color: var(--l-neutral-text);
+}
+.landing-appt.is-confirmed .landing-badge {
+  background: var(--l-ok-bg);
+  color: var(--l-ok-text);
+}
+.landing-appt.is-cancelled .landing-badge {
+  background: var(--l-off-bg);
+  color: var(--l-off-text);
+}
+.landing-preview-note {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--l-muted);
+}
+
+@media (min-width: 880px) {
+  .landing-hero-inner {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 3rem;
+    padding-top: 4.5rem;
+    padding-bottom: 5rem;
+  }
+}
