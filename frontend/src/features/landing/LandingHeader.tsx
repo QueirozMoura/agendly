@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { ThemeToggle } from "../../components/ThemeToggle";
 
 export interface LandingNavItem {
   /** Id da seção na página (sem "#"). */
@@ -53,6 +54,7 @@ export function LandingHeader({ items = [] }: { items?: LandingNavItem[] }) {
           </nav>
         )}
         <div className="landing-actions">
+          <ThemeToggle variant="icon" />
           <Link to="/entrar" className="landing-button">
             Entrar
           </Link>

@@ -205,10 +205,15 @@ describe("estilos do painel (estrutura)", () => {
       "",
     );
   const css = read("src/styles.css");
-  const rootBlocks = [...css.matchAll(/:root\s*\{[^}]*\}/g)].map((m) => m[0]);
+  const block = (selector: string) =>
+    css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));
 
   it("cada token do tema claro tem o par no escuro (prefers-color-scheme)", () => {
-    const [light, dark] = rootBlocks;
+    const light = block(":root {");
+    const dark = block(':root[data-theme="dark"]');
+    const system = block(
+      ':root:not([data-theme="light"]):not([data-theme="dark"])',
+    );
     const names = (t = "") =>
       new Set([...t.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
     expect(css).toContain("@media (prefers-color-scheme: dark)");
@@ -240,11 +245,12 @@ describe("estilos do painel (estrutura)", () => {
     ]) {
       expect(names(light).has(t), `${t} (claro)`).toBe(true);
       expect(names(dark).has(t), `${t} (escuro)`).toBe(true);
+      expect(names(system).has(t), `${t} (escuro do sistema)`).toBe(true);
     }
   });
 
   it("nenhuma cor fixa fora dos tokens: os componentes só usam var(--…)", () => {
-    const rest = css.replace(/:root\s*\{[^}]*\}/g, "");
+    const rest = css.replace(/:root[^{]*\{[^}]*\}/g, "");
     expect(rest).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(rest).not.toMatch(/\b(rgb|rgba|hsl|hsla)\(/);
   });

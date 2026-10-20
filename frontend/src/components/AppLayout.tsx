@@ -17,6 +17,7 @@ import {
   PeopleIcon,
   ServicesIcon,
 } from "./icons";
+import { ThemeToggle } from "./ThemeToggle";
 import { Alert } from "./ui";
 
 // Na gaveta (telas estreitas) o botão de recolher não existe (`display: none`): fora da lista do foco circular.
@@ -253,6 +254,7 @@ export function AppLayout() {
             </span>
             <span className="user nav-label">{user?.name}</span>
           </div>
+          <ThemeToggle variant="nav" />
           <button
             type="button"
             className="nav-item nav-button"

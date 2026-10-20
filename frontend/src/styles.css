@@ -1,8 +1,8 @@
 /*
  * Estilos do painel autenticado e das telas de acesso (login, cadastro etc.). A landing pública (`/`) tem os seus em
  * `features/landing/landing.css`, todos sob `.landing`; aqui só os seletores de elemento mínimos (body, h1, h2, a) são
- * compartilhados e foram mantidos como eram. O tema segue `prefers-color-scheme` (não há seletor manual: o app não usa
- * armazenamento do navegador para guardar preferência). Toda cor dos componentes vem destes tokens.
+ * compartilhados e foram mantidos como eram. O tema é claro, escuro ou "sistema" (`prefers-color-scheme`); a escolha manual
+ * vira `data-theme` em <html> (lib/theme.ts) e vale também para a landing. Toda cor dos componentes vem destes tokens.
  */
 :root {
   color-scheme: light dark;
@@ -34,8 +34,39 @@
   --sidebar-w: 16rem;
   --sidebar-w-collapsed: 4.75rem;
 }
+/* Escuro escolhido manualmente (data-theme em <html>, ver lib/theme.ts) */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1716;
+  --surface: #14211f;
+  --surface-2: #1a2b29;
+  --text: #e6f0ee;
+  --muted: #a6b9b6;
+  --border: #2a3d3a;
+  --control-border: #5d7f7b;
+  --primary: #2dd4bf;
+  --primary-hover: #5eead4;
+  --primary-text: #04201c;
+  --primary-soft: #12312d;
+  --primary-soft-text: #5eead4;
+  --danger-bg: #3a1c1c;
+  --danger: #ffb4b4;
+  --success-bg: #17301f;
+  --success: #9be0b6;
+  --info-bg: #12312d;
+  --info: #9ff0e2;
+  --sidebar-bg: #0f1c1a;
+  --overlay: rgb(0 0 0 / 0.6);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.5);
+  --ring: #5eead4;
+}
+/* Sem escolha ("sistema"): segue o sistema operacional */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --bg: #0d1716;
     --surface: #14211f;
     --surface-2: #1a2b29;
@@ -133,9 +164,29 @@ a {
   );
 }
 .public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   max-width: 26rem;
   margin-bottom: 1.25rem;
+}
+.theme-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.theme-button:hover {
+  border-color: var(--primary);
 }
 .card {
   width: 100%;

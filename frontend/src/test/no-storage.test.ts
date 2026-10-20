@@ -22,12 +22,49 @@ const production = walk(SRC)
 const FORBIDDEN =
   /\b(localStorage|sessionStorage|indexedDB|cookieStore|document\.cookie|caches\.|openDatabase)\b/;
 
+// ÚNICA exceção: lib/theme.ts guarda a preferência visual sob `agendly-theme`. Só estas três chamadas, sempre com a
+// constante THEME_KEY, são toleradas ali; qualquer outro uso de armazenamento (outra chave, alias, sessionStorage...) falha.
+const THEME_FILE = "lib/theme.ts";
+const THEME_CALLS =
+  /localStorage\.(getItem|removeItem)\(THEME_KEY\)|localStorage\.setItem\(THEME_KEY,/g;
+const withoutThemeCalls = (code: string) => code.replace(THEME_CALLS, "");
+
 describe("armazenamento do navegador", () => {
-  it("o código de produção não usa localStorage, sessionStorage, IndexedDB, cookies via JS nem Cache API", () => {
+  it("o código de produção não usa localStorage, sessionStorage, IndexedDB, cookies via JS nem Cache API (exceto a preferência de tema)", () => {
     expect(production.length).toBeGreaterThan(10); // sanidade: o scanner leu os arquivos
     expect(
-      production.filter((f) => FORBIDDEN.test(f.code)).map((f) => f.path),
+      production
+        .filter((f) => f.path !== THEME_FILE)
+        .filter((f) => FORBIDDEN.test(f.code))
+        .map((f) => f.path),
     ).toEqual([]);
+  });
+
+  it("lib/theme.ts usa o armazenamento só para a chave agendly-theme", () => {
+    const theme = production.find((f) => f.path === THEME_FILE);
+    expect(theme).toBeDefined();
+    const code = theme?.code ?? "";
+    expect(code).toContain('export const THEME_KEY = "agendly-theme";');
+    expect(code.match(THEME_CALLS)?.length).toBe(3);
+    expect(FORBIDDEN.test(withoutThemeCalls(code))).toBe(false);
+  });
+
+  it("o detector da exceção acusa uso fora da chave de tema (teste do teste)", () => {
+    for (const bad of [
+      'localStorage.setItem("token", t)',
+      "localStorage.getItem(OUTRA_CHAVE)",
+      "const s = localStorage; s.setItem(THEME_KEY, v)",
+      "sessionStorage.setItem(THEME_KEY, v)",
+      "document.cookie = THEME_KEY",
+    ])
+      expect(FORBIDDEN.test(withoutThemeCalls(bad)), bad).toBe(true);
+    expect(
+      FORBIDDEN.test(
+        withoutThemeCalls(
+          "localStorage.setItem(THEME_KEY, p); localStorage.getItem(THEME_KEY); localStorage.removeItem(THEME_KEY)",
+        ),
+      ),
+    ).toBe(false);
   });
 
   it("o detector acusa o uso proibido (teste do teste)", () => {

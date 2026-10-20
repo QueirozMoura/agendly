@@ -1,9 +1,8 @@
 /*
  * Estilos da página pública. Tudo vive sob `.landing` / `.landing-*`: nenhum seletor global e nenhuma alteração nos
- * tokens do painel (styles.css). Tema claro por padrão e escuro por `prefers-color-scheme`, como o resto do app.
+ * tokens do painel (styles.css). Claro por padrão; escuro por `prefers-color-scheme` ou pela escolha manual (`data-theme` em <html>, lib/theme.ts), como o resto do app.
  */
 .landing {
-  color-scheme: light dark;
   --l-bg: #f8faf9;
   --l-surface: #ffffff;
   --l-text: #14201f;
@@ -37,8 +36,29 @@
     sans-serif;
   line-height: 1.55;
 }
+:root[data-theme="dark"] .landing {
+  --l-bg: #0d1716;
+  --l-surface: #14211f;
+  --l-text: #e6f0ee;
+  --l-muted: #a6b9b6;
+  --l-border: #2a3d3a;
+  --l-control-border: #5d7f7b;
+  --l-accent: #2dd4bf;
+  --l-accent-hover: #5eead4;
+  --l-accent-text: #04201c;
+  --l-focus: #5eead4;
+  --l-header-bg: rgb(13 23 22 / 0.9);
+  --l-hero-glow: #10302c;
+  --l-ok-bg: #12312d;
+  --l-ok-text: #5eead4;
+  --l-neutral-bg: #1d2f2c;
+  --l-neutral-text: #c3d3d0;
+  --l-off-bg: #3a2020;
+  --l-off-text: #f0b4b4;
+  --l-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
 @media (prefers-color-scheme: dark) {
-  .landing {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .landing {
     --l-bg: #0d1716;
     --l-surface: #14211f;
     --l-text: #e6f0ee;
@@ -126,6 +146,14 @@
   text-decoration: none;
   cursor: pointer;
 }
+.landing .theme-button {
+  border-color: var(--l-control-border);
+  background: var(--l-surface);
+  color: var(--l-text);
+}
+.landing .theme-button:hover {
+  border-color: var(--l-accent);
+}
 .landing-button:hover {
   border-color: var(--l-accent);
 }
@@ -167,25 +195,28 @@
   background: var(--l-bg);
   border-bottom: 1px solid var(--l-border);
 }
-/* Telas estreitas: barra mais compacta para brand + 2 botões + menu caberem a 375 px */
+/* Telas estreitas: barra mais compacta para brand + tema + 2 botões + menu caberem a 375 px */
 @media (max-width: 479px) {
   .landing-header-bar {
-    gap: 0.5rem;
-  }
-  .landing-brand {
-    font-size: 1.1rem;
-  }
-  .landing-actions {
     gap: 0.375rem;
   }
+  .landing-brand {
+    font-size: 1rem;
+  }
+  .landing-actions {
+    gap: 0.25rem;
+  }
   .landing-button {
-    padding: 0 0.625rem;
+    padding: 0 0.5rem;
     white-space: nowrap;
+  }
+  .landing .theme-button {
+    width: 2.25rem;
   }
 }
 
-/* Muito estreito (≤ 359 px): com o menu, brand + 2 botões + menu não cabem numa linha; os botões descem para a segunda */
-@media (max-width: 359px) {
+/* Muito estreito (≤ 372 px): com o menu, brand + tema + 2 botões + menu não cabem numa linha; os botões descem para a segunda */
+@media (max-width: 372px) {
   .landing-header-bar {
     flex-wrap: wrap;
   }

@@ -39,7 +39,9 @@ describe("LandingHeader", () => {
   it("sem seções não mostra navegação nem botão de menu (nada de link morto)", () => {
     header();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /menu/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("com seções: links de âncora e menu acessível que abre, fecha e se fecha ao escolher", async () => {
@@ -75,6 +77,8 @@ describe("LandingHeader: ordem do foco", () => {
     await user.tab();
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveFocus();
     await user.tab();
+    expect(screen.getByRole("button", { name: /^Tema:/ })).toHaveFocus();
+    await user.tab();
     expect(screen.getByRole("link", { name: "Entrar" })).toHaveFocus();
   });
 });
@@ -90,7 +94,11 @@ describe("landing.css", () => {
       (m[2] ?? "").split(",").map((s) => s.trim()),
     );
     expect(selectors.length).toBeGreaterThan(10);
-    for (const sel of selectors) expect(sel, sel).toMatch(/^\.landing/);
+    // `:root[data-theme="dark"] .landing` e a variante do sistema só redefinem tokens da landing sob `.landing`
+    for (const sel of selectors)
+      expect(sel, sel).toMatch(
+        /^(\.landing|:root(\[[^\]]+\]|:not\(\[[^\]]+\]\))+ \.landing)/,
+      );
   });
 
   it("não há regra genérica `.landing a` (ela vence `.landing-primary` e apaga a cor do texto dos botões)", () => {
@@ -99,11 +107,15 @@ describe("landing.css", () => {
 
   it("não redefine os tokens do painel", () => {
     expect(css).not.toMatch(/--(bg|surface|text|muted|border|primary)\s*:/);
-    expect(css).not.toMatch(/:root|(^|\s)body\s*\{/);
+    expect(css).not.toMatch(/(^|\s)body\s*\{/);
+    // `:root` só aparece como prefixo de seletores que terminam em `.landing` (escolha manual do tema)
+    for (const sel of css.match(/:root[^{]*/g) ?? [])
+      expect(sel.trim(), sel).toMatch(/\.landing$/);
   });
 
   it("define tema claro e escuro (prefers-color-scheme) com o mesmo conjunto de tokens", () => {
-    const [light, dark] = css.split("@media (prefers-color-scheme: dark)");
+    const light = css.slice(0, css.indexOf(':root[data-theme="dark"]'));
+    const dark = css.slice(css.indexOf("@media (prefers-color-scheme: dark)"));
     expect(dark).toBeDefined();
     const names = (t: string) =>
       new Set([...t.matchAll(/(--l-[a-z-]+)\s*:/g)].map((m) => m[1]));

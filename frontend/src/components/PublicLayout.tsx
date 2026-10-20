@@ -1,5 +1,6 @@
 import { Link, Outlet } from "react-router";
 import { BrandMark } from "./icons";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function PublicLayout() {
   return (
@@ -9,6 +10,7 @@ export function PublicLayout() {
           <BrandMark />
           <span>Agendly</span>
         </Link>
+        <ThemeToggle variant="icon" />
       </header>
       <main className="card">
         <Outlet />
