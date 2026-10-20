@@ -257,7 +257,7 @@ function AgendaBody({
     );
   const truncated = appointments.length >= LIST_MAX;
   if (appointments.length === 0)
-    return <p>Nenhum agendamento neste período.</p>;
+    return <p className="empty">Nenhum agendamento neste período.</p>;
 
   // Dia local de cada agendamento; um que começou antes do período (e ainda o atravessa) aparece no primeiro dia exibido.
   const dayOf = (a: ApiAppointment) => {

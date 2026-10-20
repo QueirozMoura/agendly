@@ -79,7 +79,7 @@ export function WorkingHoursSection({
       {resource.status === "ready" && (
         <>
           {resource.data.length === 0 && (
-            <p>
+            <p className="empty">
               Nenhum horário cadastrado: o profissional não terá horários
               disponíveis.
             </p>

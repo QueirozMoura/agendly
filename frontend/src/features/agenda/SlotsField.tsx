@@ -66,7 +66,7 @@ function SlotsBody({
       </>
     );
   if (resource.data.length === 0)
-    return <p>Nenhum horário disponível neste dia.</p>;
+    return <p className="empty">Nenhum horário disponível neste dia.</p>;
   return (
     <SlotPicker
       name={name}

@@ -50,7 +50,12 @@ export function ServicesPage() {
   return (
     <section className="page">
       <div className="page-head">
-        <h1>Serviços</h1>
+        <div>
+          <h1>Serviços</h1>
+          <p className="page-sub">
+            O que você oferece: duração, intervalo de preparação e preço.
+          </p>
+        </div>
         {editing === null && (
           <button
             type="button"
@@ -82,7 +87,7 @@ export function ServicesPage() {
 
       {services.length === 0 ? (
         editing === null && (
-          <p>
+          <p className="empty">
             Nenhum serviço cadastrado ainda. Crie o primeiro para poder
             vinculá-lo aos profissionais.
           </p>

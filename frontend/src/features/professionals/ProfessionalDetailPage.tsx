@@ -201,7 +201,7 @@ function ServiceLinks({
       {save.error && <Alert kind="error">{save.error}</Alert>}
       {notice && <Alert kind="success">{notice}</Alert>}
       {services.length === 0 ? (
-        <p>
+        <p className="empty">
           Ainda não há serviços. <Link to="/servicos">Cadastre um serviço</Link>{" "}
           para poder vinculá-lo.
         </p>

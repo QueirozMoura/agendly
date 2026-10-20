@@ -75,8 +75,13 @@ export function OrganizationSelectPage() {
   return (
     <section className="page">
       <h1>Suas empresas</h1>
+      <p className="page-sub">
+        Escolha a empresa que quer gerenciar ou crie uma nova.
+      </p>
       {orgs.organizations.length === 0 ? (
-        <p>Você ainda não tem nenhuma empresa. Crie a primeira para começar.</p>
+        <p className="empty">
+          Você ainda não tem nenhuma empresa. Crie a primeira para começar.
+        </p>
       ) : (
         <>
           {selectError && <Alert kind="error">{selectError}</Alert>}
@@ -87,7 +92,7 @@ export function OrganizationSelectPage() {
                   <strong>{o.name}</strong>
                   <span className="muted"> · {o.slug}</span>
                   {o.slug === orgs.activeSlug && (
-                    <span className="badge">Ativa</span>
+                    <span className="badge badge-confirmed">Ativa</span>
                   )}
                 </div>
                 <button

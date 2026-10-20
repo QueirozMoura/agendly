@@ -72,7 +72,7 @@ export function TimeOffSection({
       {resource.status === "ready" && (
         <>
           {resource.data.length === 0 ? (
-            <p>Nenhuma folga cadastrada.</p>
+            <p className="empty">Nenhuma folga cadastrada.</p>
           ) : (
             <ul className="rows" aria-label="Folgas cadastradas">
               {resource.data.map((o) =>

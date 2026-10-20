@@ -49,8 +49,13 @@ export function ProfessionalsPage() {
   return (
     <section className="page">
       <h1>Profissionais</h1>
+      <p className="page-sub">
+        Quem atende e quais serviços cada pessoa realiza.
+      </p>
       {professionals.length === 0 ? (
-        <p>Nenhum profissional cadastrado ainda. Cadastre o primeiro abaixo.</p>
+        <p className="empty">
+          Nenhum profissional cadastrado ainda. Cadastre o primeiro abaixo.
+        </p>
       ) : (
         <ul className="rows" aria-label="Profissionais">
           {professionals.map((p) => (

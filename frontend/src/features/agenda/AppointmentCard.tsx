@@ -73,7 +73,9 @@ export function AppointmentCard({
           <strong className="appt-time">
             {sameDay ? time : formatDateTime(a.startsAt, timeZone)}
           </strong>
-          <span className="badge">{STATUS_LABEL[a.status]}</span>
+          <span className={`badge badge-${a.status.toLowerCase()}`}>
+            {STATUS_LABEL[a.status]}
+          </span>
         </div>
         <div>{a.customer.name}</div>
         <div className="muted">
