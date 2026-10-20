@@ -3,6 +3,7 @@
 // backend de verdade (documentado em STAGE-11-VALIDATIONS.md); serve para exercitar a UI de forma determinística.
 import { http, HttpResponse } from "msw";
 import type { ApiOrganization, ApiUser } from "../api/types";
+import { makePanel, panelBackend, type PanelState } from "./fakePanel";
 
 export interface FakeState {
   user: ApiUser | null; // sessão atual (cookie)
@@ -11,6 +12,8 @@ export interface FakeState {
   activeSlug: string | null;
   validVerifyToken: string;
   validResetToken: string;
+  /** Serviços, profissionais, expediente e folgas da empresa ativa (Etapa 12). */
+  panel: PanelState;
   calls: Array<{
     method: string;
     path: string;
@@ -54,12 +57,13 @@ export function makeState(over: Partial<FakeState> = {}): FakeState {
     activeSlug: null,
     validVerifyToken: "token-de-verificacao",
     validResetToken: "token-de-reset",
+    panel: makePanel(),
     calls: [],
     ...over,
   };
 }
 
-const error = (
+export const error = (
   status: number,
   code: string,
   message: string,
@@ -71,7 +75,7 @@ const error = (
     { status, ...(headers ? { headers } : {}) },
   );
 
-const unauthorized = () =>
+export const unauthorized = () =>
   error(401, "UNAUTHENTICATED", "Sessão inválida ou expirada.");
 
 export function fakeBackend(state: FakeState) {
@@ -251,5 +255,6 @@ export function fakeBackend(state: FakeState) {
       const org = state.organizations.find((o) => o.slug === state.activeSlug)!;
       return HttpResponse.json({ organization: org });
     }),
+    ...panelBackend(state),
   ];
 }

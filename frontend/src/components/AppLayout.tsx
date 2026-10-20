@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Outlet, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { ApiError, messageOf } from "../api/client";
 import { useApi } from "../api/ApiContext";
 import { useAuth } from "../features/auth/AuthContext";
@@ -57,6 +57,15 @@ export function AppLayout() {
         <Link to="/" className="brand">
           Agendly
         </Link>
+        {orgs.activeSlug !== null && (
+          <nav aria-label="Principal" className="mainnav">
+            <NavLink to="/" end>
+              Início
+            </NavLink>
+            <NavLink to="/servicos">Serviços</NavLink>
+            <NavLink to="/profissionais">Profissionais</NavLink>
+          </nav>
+        )}
         <div className="topbar-actions">
           {orgs.organizations.length > 0 && (
             <label className="inline-label">

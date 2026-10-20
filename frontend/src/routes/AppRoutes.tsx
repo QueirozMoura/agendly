@@ -12,6 +12,9 @@ import { RegisterPage } from "../features/auth/RegisterPage";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage";
 import { VerifyEmailPage } from "../features/auth/VerifyEmailPage";
 import { OrganizationSelectPage } from "../features/organizations/OrganizationSelectPage";
+import { ProfessionalDetailPage } from "../features/professionals/ProfessionalDetailPage";
+import { ProfessionalsPage } from "../features/professionals/ProfessionalsPage";
+import { ServicesPage } from "../features/services/ServicesPage";
 import { HomePage } from "./HomePage";
 import { NotFoundPage } from "./NotFoundPage";
 
@@ -33,6 +36,12 @@ export function AppRoutes() {
           <Route path="/empresas" element={<OrganizationSelectPage />} />
           <Route element={<RequireOrganization />}>
             <Route index element={<HomePage />} />
+            <Route path="/servicos" element={<ServicesPage />} />
+            <Route path="/profissionais" element={<ProfessionalsPage />} />
+            <Route
+              path="/profissionais/:id"
+              element={<ProfessionalDetailPage />}
+            />
           </Route>
         </Route>
       </Route>
