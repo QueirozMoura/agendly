@@ -3,6 +3,7 @@
 // backend de verdade (documentado em STAGE-11-VALIDATIONS.md); serve para exercitar a UI de forma determinística.
 import { http, HttpResponse } from "msw";
 import type { ApiOrganization, ApiUser } from "../api/types";
+import { agendaBackend, makeAgenda, type AgendaState } from "./fakeAgenda";
 import { makePanel, panelBackend, type PanelState } from "./fakePanel";
 
 export interface FakeState {
@@ -14,11 +15,15 @@ export interface FakeState {
   validResetToken: string;
   /** Serviços, profissionais, expediente e folgas da empresa ativa (Etapa 12). */
   panel: PanelState;
+  /** Agendamentos e horários livres da empresa ativa (Etapa 13). */
+  agenda: AgendaState;
   calls: Array<{
     method: string;
     path: string;
     body: unknown;
     headers: Headers;
+    /** Query string (`?a=b`), registrada pelas rotas do painel e da agenda. */
+    search?: string;
   }>;
 }
 
@@ -58,6 +63,7 @@ export function makeState(over: Partial<FakeState> = {}): FakeState {
     validVerifyToken: "token-de-verificacao",
     validResetToken: "token-de-reset",
     panel: makePanel(),
+    agenda: makeAgenda(),
     calls: [],
     ...over,
   };
@@ -256,5 +262,6 @@ export function fakeBackend(state: FakeState) {
       return HttpResponse.json({ organization: org });
     }),
     ...panelBackend(state),
+    ...agendaBackend(state),
   ];
 }

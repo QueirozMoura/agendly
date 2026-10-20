@@ -90,6 +90,7 @@ export async function startServer(
         keyring: env.OUTBOX_KEYRING,
         allowedOrigins: env.ALLOWED_ORIGINS,
         secureCookies: env.NODE_ENV === "production",
+        requireEmailVerification: env.REQUIRE_EMAIL_VERIFICATION,
       },
     });
     await app.listen({ host: env.HOST, port: env.PORT });

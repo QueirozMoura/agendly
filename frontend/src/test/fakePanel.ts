@@ -98,17 +98,16 @@ const validation = (path: string, message: string) =>
 const notFound = () => error(404, "NOT_FOUND", "Recurso não encontrado.");
 const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
 
-export function panelBackend(state: FakeState) {
-  const panel = state.panel;
-  const nextId = (prefix: string) => `${prefix}-${++panel.seq}`;
+export type Ctx = {
+  body: Record<string, unknown>;
+  request: Request;
+  params: Record<string, string>;
+  url: URL;
+};
 
-  type Ctx = {
-    body: Record<string, unknown>;
-    request: Request;
-    params: Record<string, string>;
-    url: URL;
-  };
-  const route = (
+/** Rota com a regra de tenant do backend: CSRF (415), registro da chamada, 401, 403 sem empresa e `X-Active-Org`. */
+export function tenantRoute(state: FakeState) {
+  return (
     method: "get" | "post" | "patch" | "put" | "delete",
     path: string,
     fn: (ctx: Ctx) => Response | Promise<Response>,
@@ -135,6 +134,7 @@ export function panelBackend(state: FakeState) {
         path: url.pathname,
         body,
         headers: request.headers,
+        search: url.search,
       });
       if (!state.user) return unauthorized();
       if (!state.activeSlug)
@@ -157,6 +157,13 @@ export function panelBackend(state: FakeState) {
         url,
       });
     });
+}
+
+export function panelBackend(state: FakeState) {
+  const panel = state.panel;
+  const nextId = (prefix: string) => `${prefix}-${++panel.seq}`;
+
+  const route = tenantRoute(state);
 
   const conflict = (code: string) =>
     error(409, code, "Conflito com agendamentos ativos.", {

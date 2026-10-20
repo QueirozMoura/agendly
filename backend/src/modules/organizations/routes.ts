@@ -23,6 +23,8 @@ import {
 export interface OrganizationRoutesOptions {
   prisma: PrismaClient;
   secureCookies: boolean;
+  /** R10: exigir e-mail verificado para criar empresa. Desligável só por configuração do servidor (temporário). */
+  requireEmailVerification: boolean;
 }
 
 // Criação de empresas é rara; o limite evita criação em massa (por usuário e por IP). Em memória (instância única).
@@ -36,7 +38,7 @@ export async function organizationRoutes(
   app: FastifyInstance,
   opts: OrganizationRoutesOptions,
 ): Promise<void> {
-  const { prisma, secureCookies } = opts;
+  const { prisma, secureCookies, requireEmailVerification } = opts;
   const deps = { prisma };
   const authenticate = makeAuthenticate(app, { prisma, secureCookies });
   const tenantRoute = createTenantGuard(app, { prisma, secureCookies });
@@ -61,7 +63,7 @@ export async function organizationRoutes(
     }
   });
 
-  // --- Criar empresa (exige e-mail verificado: R10) ---
+  // --- Criar empresa (exige e-mail verificado: R10, salvo REQUIRE_EMAIL_VERIFICATION=false, temporário) ---
   app.post(
     "/api/organizations",
     { preHandler: authenticate, config: USER_SCOPED },
@@ -70,7 +72,7 @@ export async function organizationRoutes(
       const { user, sessionId } = request.auth as NonNullable<
         typeof request.auth
       >;
-      if (!user.emailVerifiedAt) {
+      if (requireEmailVerification && !user.emailVerifiedAt) {
         throw new AppError(
           "EMAIL_NOT_VERIFIED",
           403,

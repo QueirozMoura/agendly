@@ -22,8 +22,11 @@ export function fieldErrorsFromApi(err: unknown): FieldErrors {
       path?: unknown;
       message?: unknown;
     }>) {
-      if (typeof d.path === "string" && typeof d.message === "string")
+      if (typeof d.path === "string" && typeof d.message === "string") {
         out[d.path.split(".")[0] ?? "_"] ??= d.message;
+        // Campo aninhado ("customer.phone"): também disponível pelo caminho completo.
+        if (d.path.includes(".")) out[d.path] ??= d.message;
+      }
     }
   }
   return out;

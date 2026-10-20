@@ -43,6 +43,7 @@ export interface AuthTestApp {
 export async function makeAuthApp(
   opts: {
     secureCookies?: boolean;
+    requireEmailVerification?: boolean;
     databaseUrlOverride?: string;
     /** Devolve o cliente que a API usa (ex.: com `$extends` para injetar falhas e barreiras). */
     wrapPrisma?: (prisma: PrismaClient) => PrismaClient;
@@ -83,6 +84,9 @@ export async function makeAuthApp(
       keyring: TEST_KEYRING,
       allowedOrigins: [ORIGIN],
       secureCookies: opts.secureCookies ?? false,
+      ...(opts.requireEmailVerification === undefined
+        ? {}
+        : { requireEmailVerification: opts.requireEmailVerification }),
     },
   });
   await app.ready();

@@ -705,3 +705,68 @@ describe("regressão dos fluxos de autenticação com a empresa ativa", () => {
     ).toHaveLength(1);
   });
 });
+
+describe("verificação de e-mail temporariamente dispensada (REQUIRE_EMAIL_VERIFICATION=false)", () => {
+  let lax: AuthTestApp;
+  beforeEach(async () => {
+    lax = await makeAuthApp({ requireEmailVerification: false });
+  });
+  afterEach(() => lax.close());
+
+  it("usuário NÃO verificado cria empresa, vira OWNER e usa a empresa ativa", async () => {
+    const bob = await signupUnverified(lax, "bob@example.com");
+    const res = await createOrg(lax, bob, "empresa-do-bob");
+    expect(res.statusCode).toBe(201);
+    expect(await lax.prisma.membership.count()).toBe(1);
+    const me = await api(lax, "GET", "/api/organization", bob);
+    expect(me.statusCode).toBe(200);
+    expect(me.json().organization.slug).toBe("empresa-do-bob");
+    const user = await lax.prisma.user.findUniqueOrThrow({
+      where: { email: "bob@example.com" },
+    });
+    expect(user.emailVerifiedAt).toBeNull(); // nada foi marcado como verificado
+  });
+
+  it("autenticação e isolamento continuam valendo: sem sessão 401; outra empresa não é acessível", async () => {
+    const anon = await api(
+      lax,
+      "POST",
+      "/api/organizations",
+      undefined,
+      orgInput("x"),
+    );
+    expect(anon.statusCode).toBe(401);
+    const bob = await signupUnverified(lax, "bob@example.com");
+    const eve = await signupUnverified(lax, "eve@example.com");
+    await createOrg(lax, bob, "empresa-do-bob");
+    await createOrg(lax, eve, "empresa-da-eve");
+    const cross = await api(
+      lax,
+      "POST",
+      "/api/session/active-organization",
+      bob,
+      {
+        slug: "empresa-da-eve",
+      },
+    );
+    expect(cross.statusCode).toBe(404);
+    const list = await api(lax, "GET", "/api/organizations", bob);
+    expect(
+      list.json().organizations.map((o: { slug: string }) => o.slug),
+    ).toEqual(["empresa-do-bob"]);
+  });
+
+  it("nada vindo do cliente liga ou desliga a regra: o app estrito segue recusando", async () => {
+    const bob = await signupUnverified(t, "bob@example.com");
+    const res = await api(
+      t,
+      "POST",
+      "/api/organizations?requireEmailVerification=false",
+      bob,
+      { ...orgInput("empresa-do-bob"), requireEmailVerification: false },
+      { "x-require-email-verification": "false" },
+    );
+    expect(res.statusCode).not.toBe(201);
+    expect(await t.prisma.organization.count()).toBe(0);
+  });
+});

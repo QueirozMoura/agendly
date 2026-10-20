@@ -30,6 +30,11 @@ export interface AuthOptions {
   allowedOrigins: readonly string[];
   /** true em produção: cookie Secure com prefixo __Host-. */
   secureCookies: boolean;
+  /**
+   * Exigir e-mail verificado para criar empresa (R10). Omitido = exigido (padrão seguro). TEMPORARIAMENTE `false` em
+   * desenvolvimento via REQUIRE_EMAIL_VERIFICATION (config do servidor, nunca do cliente).
+   */
+  requireEmailVerification?: boolean;
 }
 
 export interface AppOptions extends HealthDeps {
@@ -68,10 +73,16 @@ export function buildApp(options: AppOptions): FastifyInstance {
 
   if (options.auth) {
     const { prisma, keyring, allowedOrigins, secureCookies } = options.auth;
+    const requireEmailVerification =
+      options.auth.requireEmailVerification ?? true;
     registerCsrfProtection(app, allowedOrigins);
     app.register(cookie);
     app.register(rateLimit, { global: false }); // limites aplicados por rota (createRateLimit)
-    app.register(organizationRoutes, { prisma, secureCookies });
+    app.register(organizationRoutes, {
+      prisma,
+      secureCookies,
+      requireEmailVerification,
+    });
     app.register(serviceRoutes, { prisma, secureCookies });
     app.register(professionalRoutes, { prisma, secureCookies });
     app.register(availabilityRoutes, { prisma, secureCookies });

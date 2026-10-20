@@ -97,3 +97,32 @@ export interface ConflictDetails {
   totalCount: number;
   truncated: boolean;
 }
+
+export type AppointmentStatus =
+  "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+
+/** Agendamento como a API devolve. `service` são os SNAPSHOTS copiados na criação (R3), nunca os valores atuais. */
+export interface ApiAppointment {
+  id: string;
+  professionalId: string;
+  serviceId: string;
+  customer: { id: string; name: string };
+  /** Instantes ISO 8601 em UTC; `blockedUntil` = fim + intervalo de preparação. */
+  startsAt: string;
+  endsAt: string;
+  blockedUntil: string;
+  status: AppointmentStatus;
+  service: {
+    name: string;
+    durationMinutes: number;
+    bufferMinutes: number;
+    priceCents: number | null;
+  };
+  source: "PANEL" | "PUBLIC";
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  /** Controle otimista: toda ação (remarcar, cancelar) envia a versão que o usuário viu. */
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}

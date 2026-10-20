@@ -61,6 +61,8 @@ export interface RequestOptions {
    * inicial de `/api/me`): o erro é devolvido à tela sem acionar o tratador central.
    */
   anonymous?: boolean;
+  /** Cabeçalhos adicionais (ex.: `Idempotency-Key`). Não substituem `content-type` nem `x-active-org`. */
+  headers?: Record<string, string>;
 }
 
 const NO_ACTIVE_ORG_CODES = new Set([
@@ -101,7 +103,10 @@ export class ApiClient {
     path: string,
     options: RequestOptions = {},
   ): Promise<T> {
-    const headers: Record<string, string> = { accept: "application/json" };
+    const headers: Record<string, string> = {
+      accept: "application/json",
+      ...options.headers,
+    };
     if (this.activeOrg) headers["x-active-org"] = this.activeOrg;
     let body: string | undefined;
     if (method !== "GET") {

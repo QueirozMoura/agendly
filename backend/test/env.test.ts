@@ -10,6 +10,42 @@ const PROD_KEYS = {
 };
 const valid = { DATABASE_URL: "postgresql://u:p@localhost:5432/db" };
 
+describe("REQUIRE_EMAIL_VERIFICATION (temporário)", () => {
+  it("padrão: dispensado fora de produção, exigido em produção", () => {
+    expect(loadEnv(valid).REQUIRE_EMAIL_VERIFICATION).toBe(false);
+    expect(
+      loadEnv({
+        ...valid,
+        NODE_ENV: "production",
+        ALLOWED_ORIGINS: "https://app.example.com",
+        ...PROD_KEYS,
+      }).REQUIRE_EMAIL_VERIFICATION,
+    ).toBe(true);
+  });
+
+  it("pode ser exigido explicitamente fora de produção; valor inválido é recusado", () => {
+    expect(
+      loadEnv({ ...valid, REQUIRE_EMAIL_VERIFICATION: "true" })
+        .REQUIRE_EMAIL_VERIFICATION,
+    ).toBe(true);
+    expect(() =>
+      loadEnv({ ...valid, REQUIRE_EMAIL_VERIFICATION: "talvez" }),
+    ).toThrow(EnvError);
+  });
+
+  it("em produção, desligar a verificação é recusado", () => {
+    expect(() =>
+      loadEnv({
+        ...valid,
+        NODE_ENV: "production",
+        ALLOWED_ORIGINS: "https://app.example.com",
+        ...PROD_KEYS,
+        REQUIRE_EMAIL_VERIFICATION: "false",
+      }),
+    ).toThrow(/REQUIRE_EMAIL_VERIFICATION/);
+  });
+});
+
 describe("loadEnv", () => {
   it("aplica padrões e aceita ambiente válido", () => {
     const env = loadEnv(valid);

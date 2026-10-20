@@ -25,6 +25,10 @@ const envSchema = z.object({
   OUTBOX_CURRENT_KEY_ID: z.string().optional(),
   // URL pública da SPA, usada nos links dos e-mails. Padrão: a primeira de ALLOWED_ORIGINS.
   APP_BASE_URL: z.string().optional(),
+  // TEMPORÁRIO (desenvolvimento/validação local, enquanto o envio de e-mail não está configurado): exigir e-mail verificado
+  // para criar empresa (R10). Padrão: exigido em produção, dispensado fora dela. Em produção `false` é recusado.
+  // Variável do SERVIDOR; nada vindo do cliente a influencia. Ver docs/EMAIL-VERIFICATION-TEMPORARILY-DISABLED.md.
+  REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false"]).optional(),
   // true somente atrás de proxy reverso confiável (Caddy/Nginx): faz req.ip vir de X-Forwarded-For.
   TRUST_PROXY: z
     .enum(["true", "false"])
@@ -40,7 +44,9 @@ export type Env = Omit<
   | "OUTBOX_ENCRYPTION_KEYS"
   | "OUTBOX_CURRENT_KEY_ID"
   | "APP_BASE_URL"
+  | "REQUIRE_EMAIL_VERIFICATION"
 > & {
+  REQUIRE_EMAIL_VERIFICATION: boolean;
   ALLOWED_ORIGINS: string[];
   APP_BASE_URL: string;
   OUTBOX_KEYRING: Keyring;
@@ -130,6 +136,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
         invalid,
       )
     : "";
+  if (
+    result.success &&
+    result.data.NODE_ENV === "production" &&
+    result.data.REQUIRE_EMAIL_VERIFICATION === "false"
+  )
+    invalid.push("REQUIRE_EMAIL_VERIFICATION");
   if (!result.success || invalid.length > 0) {
     throw new EnvError(
       `Variáveis de ambiente inválidas ou ausentes: ${[...new Set(invalid)].join(", ")}`,
@@ -143,6 +155,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     LOG_LEVEL: d.LOG_LEVEL,
     DATABASE_URL: d.DATABASE_URL,
     TRUST_PROXY: d.TRUST_PROXY,
+    REQUIRE_EMAIL_VERIFICATION:
+      d.REQUIRE_EMAIL_VERIFICATION === undefined
+        ? d.NODE_ENV === "production"
+        : d.REQUIRE_EMAIL_VERIFICATION === "true",
     ALLOWED_ORIGINS: origins,
     APP_BASE_URL: baseUrl,
     OUTBOX_KEYRING: keyring,
