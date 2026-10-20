@@ -1,8 +1,14 @@
 # Verificação de e-mail e recuperação de senha
 
-> **Status da entrega real de e-mails: PENDENTE e NÃO validada.** Nenhuma credencial do provedor estava disponível. A lógica
-> (tokens, outbox, regra de bloqueio, adaptador do Resend) foi testada com **mocks**; nenhum e-mail real foi enviado e a
-> chamada à API do Resend nunca foi feita. Não declarar V10 (entregabilidade, SPF/DKIM/DMARC, limites do plano) como resolvida.
+> **Status da entrega real de e-mails: validada em DESENVOLVIMENTO; PRODUÇÃO pendente.**
+>
+> - **Validado em desenvolvimento (20/10/2026)**, com o Resend real e o remetente de teste `onboarding@resend.dev` (que só entrega
+>   ao e-mail do dono da conta do Resend): cadastro de e-mail já existente (`ACCOUNT_EXISTS`), recuperação e redefinição de senha
+>   (`RESET_PASSWORD` e `PASSWORD_CHANGED`), reenvio da confirmação pelo painel (`VERIFY_EMAIL`), clique no link no navegador,
+>   `email_verified_at` preenchido, token consumido, linhas da outbox em `SENT` na 1ª tentativa e sessão funcionando.
+> - **NÃO validado:** produção; domínio próprio e SPF/DKIM/DMARC; entregabilidade (spam, reputação, aba da caixa de entrada);
+>   a verificação de configuração na subida (`GET /domains`), que só roda em produção; a classificação de erros do Resend e o
+>   retry diante de falhas reais; o efeito do `Idempotency-Key`; limites do plano. Não declarar V10 como resolvida.
 
 ## Regra (R10)
 
@@ -77,7 +83,13 @@ são lidos, e nunca vão a log nem a erro (a mensagem registrada é "Resend resp
 - **`Retry-After`:** lido em 429/503/409 (segundos inteiros; datas são ignoradas). A espera até a próxima tentativa passa a ser `max(backoff, Retry-After)`, limitada a 15 min
   (`backoffMaxMs`). Se isso passar do `notAfter` da mensagem, ela expira sem novo envio.
 
-### Como configurar (pendente de execução humana)
+### Como configurar
+
+**Desenvolvimento (feito e validado):** colocar `RESEND_API_KEY` e `EMAIL_FROM` no `.env` da raiz (fora do Git) e reiniciar a API.
+Sem domínio verificado, usar `EMAIL_FROM=onboarding@resend.dev` e cadastrar com o e-mail do dono da conta do Resend. Para voltar ao
+console, comente as duas variáveis.
+
+**Produção (pendente de execução humana):**
 
 1. Criar conta no Resend, adicionar e verificar o domínio de envio (SPF e DKIM no DNS; publicar DMARC).
 2. Gerar uma chave de API. Prefira uma com acesso de leitura de domínios para que a verificação na subida possa conferir o domínio; uma chave só de envio funciona, mas a subida apenas avisa.
@@ -101,9 +113,12 @@ rate limit), `test/email/resend.test.ts` (adaptador, classificação, verificaç
 
 ## Pendências
 
-1. Entrega real de e-mails em produção (credenciais, domínio, SPF/DKIM/DMARC, entregabilidade, limites do plano): **não feita**.
-2. Adaptador, verificação na subida, classificação de erros, `Idempotency-Key` e `Retry-After` seguem a documentação do Resend, mas **nada foi exercitado contra a API real**
-   (nomes de erro, o 400 `validation_error` ambíguo, formato da chave, resposta de `GET /domains` e o efeito da idempotência precisam ser conferidos).
+1. Validação de **produção**, **não feita**: domínio próprio verificado no Resend (SPF, DKIM e DMARC) e `EMAIL_FROM` nele; entregabilidade e limites do plano;
+   `ALLOWED_ORIGINS` e `APP_BASE_URL` em HTTPS; `OUTBOX_ENCRYPTION_KEYS` e `OUTBOX_CURRENT_KEY_ID`; `TRUST_PROXY`; `RESEND_API_KEY`, `EMAIL_FROM` e `NODE_ENV=production`
+   configurados na plataforma de hospedagem; subida real com a verificação de `GET /domains`.
+2. Em desenvolvimento só o envio de sucesso foi exercitado contra a API real. A classificação de erros, o retry diante de falhas reais, `Retry-After`, a verificação na subida
+   e o efeito do `Idempotency-Key` seguem a documentação do Resend e **não foram exercitados** (nomes de erro, o 400 `validation_error` ambíguo, resposta de `GET /domains`
+   e a idempotência precisam ser conferidos).
 3. Etapa 14: a rota de publicar deve usar `emailPolicyAllows` (no servidor) e a de despublicar não deve exigir verificação.
 4. Reenvios deixam na fila o e-mail anterior com link já inválido (ver "Idempotência e duplicatas").
 5. Contas antigas sem verificação mantêm a empresa e o acesso; só deixam de criar outra e (Etapa 14) de publicar até verificar.
