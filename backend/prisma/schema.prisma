@@ -34,9 +34,10 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  memberships Membership[]
-  sessions    Session[]
-  authTokens  AuthToken[]
+  memberships  Membership[]
+  sessions     Session[]
+  authTokens   AuthToken[]
+  appointments Appointment[]
 
   @@map("users")
 }
@@ -58,6 +59,7 @@ model Organization {
   sessions      Session[]
   services      Service[]
   professionals Professional[]
+  customers     Customer[]
 
   @@map("organizations")
 }
@@ -182,6 +184,7 @@ model Service {
 
   organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   professionals ProfessionalService[]
+  appointments  Appointment[]
 
   // Alvo das FKs compostas (organization_id, service_id) de professional_services e appointments.
   @@unique([organizationId, id])
@@ -204,6 +207,7 @@ model Professional {
   services     ProfessionalService[]
   workingHours WorkingHours[]
   timeOff      TimeOff[]
+  appointments Appointment[]
 
   // Alvo das FKs compostas (organization_id, professional_id) de professional_services, working_hours, time_off e da etapa 10.
   @@unique([organizationId, id])
@@ -262,4 +266,98 @@ model TimeOff {
 
   @@index([organizationId, professionalId, startsAt])
   @@map("time_off")
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  PANEL
+  PUBLIC
+}
+
+// Cliente final da empresa (dado pessoal, LGPD). Sem `DELETE` (R-c): é pai de `appointments`. Telefone único por
+// empresa; o cadastro de um telefone existente NÃO sobrescreve os dados já guardados.
+model Customer {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  phoneE164      String   @map("phone_e164")
+  email          String?
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  appointments Appointment[]
+
+  // Alvo das FKs compostas (organization_id, customer_id) de appointments.
+  @@unique([organizationId, id])
+  @@unique([organizationId, phoneE164])
+  @@map("customers")
+}
+
+// Agendamento (5, 6.1). `ends_at = starts_at + duração` e `blocked_until = ends_at + buffer`, calculados por
+// `computeAppointmentRange` e verificados pelo banco (CHECK `appointments_range_coherent`, SQL manual). A exclusão
+// `appointments_no_overlap` (SQL manual) impede dois ativos sobrepostos do mesmo profissional.
+model Appointment {
+  id                      String            @id @default(uuid(7)) @db.Uuid
+  organizationId          String            @map("organization_id") @db.Uuid
+  professionalId          String            @map("professional_id") @db.Uuid
+  serviceId               String            @map("service_id") @db.Uuid
+  customerId              String            @map("customer_id") @db.Uuid
+  startsAt                DateTime          @map("starts_at") @db.Timestamptz(3)
+  endsAt                  DateTime          @map("ends_at") @db.Timestamptz(3)
+  blockedUntil            DateTime          @map("blocked_until") @db.Timestamptz(3)
+  status                  AppointmentStatus @default(SCHEDULED)
+  serviceNameSnapshot     String            @map("service_name_snapshot")
+  durationMinutesSnapshot Int               @map("duration_minutes_snapshot")
+  bufferMinutesSnapshot   Int               @map("buffer_minutes_snapshot")
+  priceCentsSnapshot      Int?              @map("price_cents_snapshot")
+  source                  AppointmentSource
+  createdByUserId         String?           @map("created_by_user_id") @db.Uuid
+  cancelledAt             DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason            String?           @map("cancel_reason")
+  // Controle otimista de edição concorrente no painel (6.6): `UPDATE … WHERE version = $n`.
+  version                 Int               @default(1)
+  createdAt               DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  professional Professional        @relation(fields: [organizationId, professionalId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  service      Service             @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  customer     Customer            @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy    User?               @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  idempotency  IdempotencyRecord[]
+
+  // Alvo da FK composta de idempotency_records.
+  @@unique([organizationId, id])
+  @@index([organizationId, professionalId, startsAt])
+  @@index([organizationId, customerId, startsAt])
+  @@index([organizationId, startsAt])
+  @@map("appointments")
+}
+
+// Registro de idempotência (6.4): vigente por 24 h. Só aparece no mesmo commit do agendamento (sem estado "em andamento").
+model IdempotencyRecord {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  scope          String
+  key            String   @db.Uuid
+  requestHash    String   @map("request_hash")
+  appointmentId  String?  @map("appointment_id") @db.Uuid
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+
+  appointment Appointment? @relation(fields: [organizationId, appointmentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([organizationId, scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_records")
 }

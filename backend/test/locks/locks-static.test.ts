@@ -77,8 +77,11 @@ function globalClientInsideTransaction(code: string): string[] {
   });
 }
 
+// Escritas N4 que exigem a trava N2 do profissional. `appointment.updateMany` (confirmar/concluir/cancelar) fica de FORA
+// de propósito: essas ações não ocupam horário e travam somente a linha do agendamento (6.5); `create`/`update` de
+// `appointment` (criar, remarcar, reativar) SEMPRE travam o profissional.
 const LEAF_WRITE =
-  /\btx\.(timeOff|workingHours|professionalService|professional)\.(create|createMany|update|updateMany|delete|deleteMany|upsert)\s*\(/g;
+  /\btx\.(?:(?:timeOff|workingHours|professionalService|professional)\.(?:create|createMany|update|updateMany|delete|deleteMany|upsert)|appointment\.(?:create|update))\s*\(/g;
 
 /** Escritas-folha (N4) que não têm `lockProfessionals(` E `enterLeafWrite(` antes, dentro do mesmo `runLocked(`. */
 function uncoveredLeafWrites(code: string): string[] {
@@ -123,6 +126,8 @@ describe("L8 — regras estáticas de transações e locks", () => {
   it("nenhum delete/deleteMany nos modelos-pai (derivados do schema): pais são desativados, nunca apagados (R-c)", () => {
     const parents = parentModels();
     expect(parents).toEqual([
+      "Appointment",
+      "Customer",
       "Organization",
       "Professional",
       "Service",
@@ -163,6 +168,7 @@ describe("L9 (estático) — escrita-folha sempre sob lockProfessionals + enterL
       (f) => [...f.code.matchAll(LEAF_WRITE)].length > 0,
     );
     expect(writers.map((f) => f.path).sort()).toEqual([
+      "modules/appointments/service.ts",
       "modules/availability/service.ts",
       "modules/professionals/service.ts",
     ]);
@@ -179,6 +185,10 @@ describe("L9 (estático) — escrita-folha sempre sob lockProfessionals + enterL
     expect(uncoveredLeafWrites(noEnter)).toHaveLength(1);
     expect(uncoveredLeafWrites(outside)).toHaveLength(1);
     expect(uncoveredLeafWrites(ok)).toEqual([]);
+    const apptNoLock = `runLocked(db, async (tx) => { enterLeafWrite(tx, id); await tx.appointment.create({}); })`;
+    const apptStatus = `runLocked(db, async (tx) => { await tx.appointment.updateMany({}); })`;
+    expect(uncoveredLeafWrites(apptNoLock)).toHaveLength(1); // criar/remarcar sem N2 é acusado
+    expect(uncoveredLeafWrites(apptStatus)).toEqual([]); // status-only não exige N2
   });
 });
 
@@ -261,7 +271,11 @@ describe("L8 (pool) — com UMA conexão no pool, nenhum fluxo usa o cliente glo
     const prisma = minimal as unknown as Parameters<
       typeof updateProfessional
     >[0];
-    const scope = { organizationId: org };
+    const scope = {
+      organizationId: org,
+      timezone: "America/Sao_Paulo",
+      now: () => new Date(),
+    };
     await updateProfessional(prisma, scope, pro, { active: true });
     await setProfessionalServices(prisma, scope, pro, [svc]);
     await setProfessionalServices(prisma, scope, pro, []);

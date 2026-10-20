@@ -12,6 +12,9 @@ export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
   "ProfessionalService",
   "WorkingHours",
   "TimeOff",
+  "Customer",
+  "Appointment",
+  "IdempotencyRecord",
 ]);
 
 /** Modelos globais (sem `organization_id`), classificados explicitamente. Modelo novo não classificado falha o teste. */

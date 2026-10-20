@@ -52,3 +52,20 @@ export async function deleteFinishedOutbox(
        WHERE status IN ('SENT', 'DEAD') AND created_at < ${old}
        LIMIT ${l.batch} FOR UPDATE SKIP LOCKED)`;
 }
+
+/**
+ * Registros de idempotência vencidos há mais que a margem (6.4). Usa o `now()` do banco, o mesmo que decide a validade na
+ * reivindicação (`expires_at <= now()`), e `FOR UPDATE SKIP LOCKED`: a linha de uma transação aberta (recém-criada, com
+ * `expires_at` a 24 h) nunca é elegível, e uma linha vencida que está sendo re-reivindicada é pulada. Atravessa empresas
+ * por desenho (limpeza por vencimento); não lê nem devolve dados de nenhuma delas.
+ */
+export async function deleteExpiredIdempotency(
+  prisma: PrismaClient,
+  l: MaintenanceLimits,
+): Promise<number> {
+  return prisma.$executeRaw`
+    DELETE FROM idempotency_records WHERE id IN (
+      SELECT id FROM idempotency_records
+       WHERE expires_at < now() - (${l.marginMs}::bigint * interval '1 millisecond')
+       LIMIT ${l.batch} FOR UPDATE SKIP LOCKED)`;
+}

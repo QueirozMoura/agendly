@@ -20,6 +20,7 @@ const OWNER_ACTIONS = [
   "customers.read",
   "customers.write",
   "customers.privacy",
+  "appointments.read",
   "appointments.create",
   "appointments.reschedule",
   "appointments.cancel",

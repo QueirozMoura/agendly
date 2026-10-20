@@ -7,6 +7,8 @@ import { can } from "../modules/auth/permissions.ts";
 export interface TenantContext {
   organizationId: string;
   organizationSlug: string;
+  /** Fuso IANA da empresa (imutável, R9): lido da empresa ativa validada, nunca do cliente. */
+  organizationTimezone: string;
   userId: string;
   role: string;
 }
@@ -49,7 +51,9 @@ export function createTenantGuard(
       relationLoadStrategy: "join",
       select: {
         role: true,
-        organization: { select: { slug: true, status: true } },
+        organization: {
+          select: { slug: true, status: true, timezone: true },
+        },
       },
     });
     if (!membership || membership.organization.status !== "ACTIVE") {
@@ -78,6 +82,7 @@ export function createTenantGuard(
     request.tenant = {
       organizationId,
       organizationSlug: membership.organization.slug,
+      organizationTimezone: membership.organization.timezone,
       userId: auth.user.id,
       role: membership.role,
     };

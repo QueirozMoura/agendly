@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import type { PrismaClient } from "../lib/db/client.ts";
 import {
   deleteExpiredAuthTokens,
+  deleteExpiredIdempotency,
   deleteExpiredSessions,
   deleteFinishedOutbox,
   type MaintenanceLimits,
@@ -38,8 +39,12 @@ export async function runMaintenance(deps: MaintenanceDeps) {
     sessions: await deleteExpiredSessions(deps.prisma, limits),
     authTokens: await deleteExpiredAuthTokens(deps.prisma, limits),
     outbox: await deleteFinishedOutbox(deps.prisma, limits),
+    idempotency: await deleteExpiredIdempotency(deps.prisma, limits),
   };
-  if (result.sessions + result.authTokens + result.outbox > 0) {
+  if (
+    result.sessions + result.authTokens + result.outbox + result.idempotency >
+    0
+  ) {
     deps.logger.info(result, "maintenance removed expired rows");
   }
   return result;

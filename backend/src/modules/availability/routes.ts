@@ -7,6 +7,7 @@ import {
   createWorkingHoursBody,
   entryIdParam,
   listByProfessionalQuery,
+  slotsQuery,
   updateTimeOffBody,
   updateWorkingHoursBody,
 } from "./schemas.ts";
@@ -15,6 +16,7 @@ import {
   createWorkingHours,
   deleteTimeOff,
   deleteWorkingHours,
+  listAvailableSlots,
   listTimeOff,
   listWorkingHours,
   updateTimeOff,
@@ -39,7 +41,8 @@ export async function availabilityRoutes(
   app.addHook("onSend", async (request, reply) => {
     if (
       request.url.startsWith("/api/working-hours") ||
-      request.url.startsWith("/api/time-off")
+      request.url.startsWith("/api/time-off") ||
+      request.url.startsWith("/api/availability")
     )
       reply.header("cache-control", "no-store");
   });
@@ -52,10 +55,19 @@ export async function availabilityRoutes(
   };
   const idOf = (request: { params: unknown }) =>
     parseId((request.params as { id?: unknown }).id);
-  const scopeOf = (request: { tenant?: { organizationId: string } }) => ({
-    organizationId: (request.tenant as { organizationId: string })
-      .organizationId,
-  });
+  const scopeOf = (request: {
+    tenant?: { organizationId: string; organizationTimezone: string };
+  }) => {
+    const tenant = request.tenant as {
+      organizationId: string;
+      organizationTimezone: string;
+    };
+    return {
+      organizationId: tenant.organizationId,
+      timezone: tenant.organizationTimezone,
+      now: () => app.clock.now(),
+    };
+  };
 
   // ── WorkingHours ──
   app.get(
@@ -151,6 +163,17 @@ export async function availabilityRoutes(
     async (request, reply) => {
       await deleteTimeOff(prisma, scopeOf(request), idOf(request));
       return reply.status(204).send();
+    },
+  );
+
+  // ── Slots (leitura, sem lock) ──
+  app.get(
+    "/api/availability/slots",
+    tenantRoute("availability.read"),
+    async (request) => {
+      const q = slotsQuery.parse(request.query);
+      const slots = await listAvailableSlots(prisma, scopeOf(request), q);
+      return { slots: slots.map((s) => s.toISOString()) };
     },
   );
 }

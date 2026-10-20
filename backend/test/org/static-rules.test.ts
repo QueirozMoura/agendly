@@ -67,6 +67,8 @@ describe("regras estáticas de src/", () => {
     "lib/db/database.ts": "SELECT 1 (readiness); sem tabelas",
     "lib/db/locks/index.ts":
       "trava users (domínio de autenticação, global), a linha de organizations pelo próprio id e professionals SEMPRE filtrada por organization_id",
+    "lib/db/locks/booking.ts":
+      "N1 customers, N3 idempotency_records e a linha de appointments: todo SQL filtra por organization_id (empresa da sessão)",
     "lib/db/locks/transaction.ts":
       "set_config('lock_timeout') da transação corrente; sem tabelas",
     "lib/db/locks/outbox.ts":
@@ -89,11 +91,15 @@ describe("regras estáticas de src/", () => {
     const tenantTables = parseSchemaModels()
       .filter((m) => m.hasOrganizationId)
       .map((m) => m.dbName);
+    // Exceção revisada: a limpeza por vencimento (R-d) atravessa empresas POR DESENHO — apaga linhas de idempotência
+    // vencidas em lotes SKIP LOCKED, sem ler nem devolver dado de nenhuma empresa.
+    const CROSS_TENANT_EXPIRY_CLEANUP = ["lib/db/locks/maintenance.ts"];
     const bad = offenders(
       (f) =>
         /\$(queryRaw|executeRaw)\b/.test(f.code) &&
         tenantTables.some((t) => new RegExp(`\\b${t}\\b`).test(f.code)) &&
-        !f.code.includes("organization_id"),
+        !f.code.includes("organization_id") &&
+        !CROSS_TENANT_EXPIRY_CLEANUP.includes(f.path),
     );
     expect(bad).toEqual([]);
   });

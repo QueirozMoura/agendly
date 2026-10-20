@@ -160,7 +160,12 @@ describe("manutenção em lotes com SKIP LOCKED", () => {
     });
 
     const r = await runMaintenance({ prisma, clock, logger });
-    expect(r).toEqual({ sessions: 3, authTokens: 2, outbox: 1 });
+    expect(r).toEqual({
+      sessions: 3,
+      authTokens: 2,
+      outbox: 1,
+      idempotency: 0,
+    });
     expect(
       (await prisma.session.findMany()).map((s) => s.tokenHash).sort(),
     ).toEqual(["ativa", "revogada-recente"]);

@@ -9,6 +9,8 @@ import type { PrismaClient } from "./lib/db/client.ts";
 import type { Keyring } from "./lib/email/keyring.ts";
 import { authRoutes } from "./modules/auth/routes.ts";
 import { registerCsrfProtection } from "./plugins/csrf.ts";
+import { appointmentRoutes } from "./modules/appointments/routes.ts";
+import { customerRoutes } from "./modules/customers/routes.ts";
 import { availabilityRoutes } from "./modules/availability/routes.ts";
 import { professionalRoutes } from "./modules/professionals/routes.ts";
 import { serviceRoutes } from "./modules/services/routes.ts";
@@ -73,6 +75,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
     app.register(serviceRoutes, { prisma, secureCookies });
     app.register(professionalRoutes, { prisma, secureCookies });
     app.register(availabilityRoutes, { prisma, secureCookies });
+    app.register(appointmentRoutes, { prisma, secureCookies });
+    app.register(customerRoutes, { prisma, secureCookies });
     app.register(authRoutes, {
       prisma,
       secureCookies,

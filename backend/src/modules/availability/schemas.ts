@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { isValidLocalDate } from "../../lib/time/zone.ts";
 import { SLOT_GRID_MINUTES } from "./slots.ts";
 
 export const AVAILABILITY_LIMITS = {
   reasonMax: 200, // teto de sanidade
   timeOffMaxDays: 366, // duração máxima de uma folga (sanidade)
   timeOffMaxPerProfessional: 1000, // sanidade
+  /** Máximo de agendamentos detalhados em `details.conflicts` (R4); o total real vai em `totalCount`. */
+  conflictListMax: 100,
   minYear: 2000,
   maxYear: 2100,
 } as const;
@@ -109,3 +112,12 @@ export const listByProfessionalQuery = z.strictObject({ professionalId });
 
 /** UUID no caminho. Malformado = inexistente (404), sem diferenciar do "não é seu". */
 export const entryIdParam = z.uuid();
+
+/** Leitura de slots: dia LOCAL da empresa ("YYYY-MM-DD"). É sugestão para a UI: nunca trava (R-e, L15). */
+export const slotsQuery = z.strictObject({
+  professionalId,
+  serviceId: z.uuid("Identificador de serviço inválido."),
+  date: z
+    .string("Informe o dia no formato AAAA-MM-DD.")
+    .refine(isValidLocalDate, "Informe o dia no formato AAAA-MM-DD."),
+});

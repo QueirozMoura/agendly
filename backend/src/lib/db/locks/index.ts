@@ -17,6 +17,14 @@ export {
   heldProfessionals,
 } from "./guard.ts";
 export {
+  claimIdempotencyKey,
+  ensureAndLockCustomerByPhone,
+  lockAppointment,
+  lockCustomerById,
+  type IdempotencyClaim,
+  type NewCustomer,
+} from "./booking.ts";
+export {
   LOCK_TIMEOUT_MS,
   TRANSACTION_OPTIONS,
   runLocked,

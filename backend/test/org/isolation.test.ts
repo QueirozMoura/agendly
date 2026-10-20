@@ -13,7 +13,16 @@ import {
   signupVerified,
   type TestUser,
 } from "../support/orgs.ts";
+import { randomUUID } from "node:crypto";
 import { sentinelViolations } from "../support/sql-sentinel.ts";
+import {
+  MONDAY,
+  at,
+  book,
+  bookOk,
+  makeBookable,
+  newCustomer,
+} from "../support/booking.ts";
 
 /**
  * Rotas `tenant` COBERTAS por este arquivo. Adicionar uma rota tenant sem entrada aqui (e sem o ataque A×B
@@ -39,6 +48,18 @@ const TENANT_ROUTES_WITH_AB_TESTS = new Set([
   "POST /api/time-off",
   "PATCH /api/time-off/:id",
   "DELETE /api/time-off/:id",
+  "GET /api/availability/slots",
+  "POST /api/appointments",
+  "GET /api/appointments",
+  "GET /api/appointments/:id",
+  "POST /api/appointments/:id/reschedule",
+  "POST /api/appointments/:id/reactivate",
+  "POST /api/appointments/:id/cancel",
+  "POST /api/appointments/:id/confirm",
+  "POST /api/appointments/:id/complete",
+  "POST /api/appointments/:id/no-show",
+  "GET /api/customers/:id",
+  "PATCH /api/customers/:id",
 ]);
 
 let t: AuthTestApp;
@@ -695,6 +716,308 @@ describe("item 5 — A×B para WorkingHours e TimeOff", () => {
   });
 });
 
+describe("item 5 — A×B para agendamentos, clientes, slots e idempotência", () => {
+  const GHOST = "00000000-0000-7000-8000-000000000999";
+  const norm = (r: { statusCode: number; json: () => { error: object } }) => ({
+    status: r.statusCode,
+    error: { ...r.json().error, requestId: 0 },
+  });
+
+  async function seed() {
+    const ba = await makeBookable(t, A);
+    const bb = await makeBookable(t, B);
+    const apptA = await bookOk(t, A, {
+      ...ba,
+      startsAt: at(MONDAY, "10:00"),
+      customer: newCustomer(1),
+    });
+    const apptB = await bookOk(t, B, {
+      ...bb,
+      startsAt: at(MONDAY, "10:00"),
+      customer: newCustomer(2),
+    });
+    return { ba, bb, apptA, apptB };
+  }
+  const snapshotOfB = async (bb: { professionalId: string }) => ({
+    appointments: await t.prisma.appointment.findMany({
+      where: { professionalId: bb.professionalId },
+      orderBy: { id: "asc" },
+    }),
+    customers: await t.prisma.customer.findMany({
+      where: { appointments: { some: { professionalId: bb.professionalId } } },
+      orderBy: { id: "asc" },
+    }),
+    idempotency: await t.prisma.idempotencyRecord.findMany({
+      where: { appointment: { professionalId: bb.professionalId } },
+    }),
+  });
+
+  it("A não lê, remarca, cancela, confirma, conclui nem reativa agendamentos de B; 404 idêntico ao de id inexistente; B intacto", async () => {
+    const { bb, apptB } = await seed();
+    const before = await snapshotOfB(bb);
+    const attack = (id: string) =>
+      Promise.all([
+        api(t, "GET", `/api/appointments/${id}`, A),
+        api(t, "POST", `/api/appointments/${id}/reschedule`, A, {
+          startsAt: at(MONDAY, "15:00"),
+          version: 1,
+        }),
+        api(t, "POST", `/api/appointments/${id}/cancel`, A, { version: 1 }),
+        api(t, "POST", `/api/appointments/${id}/confirm`, A, { version: 1 }),
+        api(t, "POST", `/api/appointments/${id}/complete`, A, { version: 1 }),
+        api(t, "POST", `/api/appointments/${id}/no-show`, A, { version: 1 }),
+        api(t, "POST", `/api/appointments/${id}/reactivate`, A, { version: 1 }),
+      ]);
+    const [real, ghost] = [await attack(apptB.id), await attack(GHOST)];
+    for (let i = 0; i < real.length; i++) {
+      expect(real[i]!.statusCode, `ataque ${i}`).toBe(404);
+      expect(norm(real[i]!), `ataque ${i}`).toEqual(norm(ghost[i]!));
+    }
+    expect(await snapshotOfB(bb)).toEqual(before);
+  });
+
+  it("A não cria agendamento com profissional, serviço ou cliente de B (404 idêntico ao inexistente); nada é criado em B", async () => {
+    const { ba, bb, apptB } = await seed();
+    const before = await snapshotOfB(bb);
+    const total = await t.prisma.appointment.count();
+    const create = (over: Record<string, unknown>) =>
+      book(t, A, {
+        ...ba,
+        startsAt: at(MONDAY, "14:00"),
+        customer: newCustomer(7),
+        ...over,
+      } as never);
+    const attempts = await Promise.all([
+      create({ professionalId: bb.professionalId }),
+      create({ serviceId: bb.serviceId }),
+      create({ customer: undefined, customerId: apptB.customer.id }),
+      create({ professionalId: bb.professionalId, serviceId: bb.serviceId }),
+    ]);
+    const ghosts = await Promise.all([
+      create({ professionalId: GHOST }),
+      create({ serviceId: GHOST }),
+      create({ customer: undefined, customerId: GHOST }),
+      create({ professionalId: GHOST, serviceId: GHOST }),
+    ]);
+    attempts.forEach((r, i) => {
+      expect(r.statusCode).toBe(404);
+      expect(norm(r)).toEqual(norm(ghosts[i]!));
+    });
+    expect(await t.prisma.appointment.count()).toBe(total);
+    expect(await snapshotOfB(bb)).toEqual(before);
+  });
+
+  it("listas e filtros só mostram a própria empresa; filtrar por profissional/cliente de B devolve vazio, igual a inexistente", async () => {
+    const { bb, apptA, apptB } = await seed();
+    const range = `from=${encodeURIComponent(at(MONDAY, "00:00"))}&to=${encodeURIComponent(at("2031-03-05", "00:00"))}`;
+    const ids = async (extra = "") =>
+      (
+        (await api(t, "GET", `/api/appointments?${range}${extra}`, A)).json()
+          .appointments as Array<{ id: string }>
+      ).map((x) => x.id);
+    expect(await ids()).toEqual([apptA.id]);
+    expect(await ids(`&professionalId=${bb.professionalId}`)).toEqual([]);
+    expect(await ids(`&professionalId=${GHOST}`)).toEqual([]);
+    expect(await ids(`&customerId=${apptB.customer.id}`)).toEqual([]);
+    expect(
+      JSON.stringify(
+        (await api(t, "GET", `/api/appointments?${range}`, A)).json(),
+      ),
+    ).not.toContain(apptB.id);
+  });
+
+  it("clientes: A não lê nem edita cliente de B (404 idêntico); B intacto", async () => {
+    const { bb, apptB } = await seed();
+    const before = await snapshotOfB(bb);
+    const url = (id: string) => `/api/customers/${id}`;
+    const real = [
+      await api(t, "GET", url(apptB.customer.id), A),
+      await api(t, "PATCH", url(apptB.customer.id), A, {
+        name: "hackeado",
+        phone: "11 90000-0000",
+      }),
+    ];
+    const ghost = [
+      await api(t, "GET", url(GHOST), A),
+      await api(t, "PATCH", url(GHOST), A, {
+        name: "hackeado",
+        phone: "11 90000-0000",
+      }),
+    ];
+    real.forEach((r, i) => {
+      expect(r.statusCode).toBe(404);
+      expect(norm(r)).toEqual(norm(ghost[i]!));
+    });
+    expect(await snapshotOfB(bb)).toEqual(before);
+  });
+
+  it("slots: profissional/serviço de B => 404 idêntico ao inexistente; o mesmo telefone em empresas diferentes são clientes independentes", async () => {
+    const { ba, bb } = await seed();
+    const slots = (q: Record<string, string>) =>
+      api(
+        t,
+        "GET",
+        `/api/availability/slots?${new URLSearchParams({ date: MONDAY, ...q })}`,
+        A,
+      );
+    const real = [
+      await slots({
+        professionalId: bb.professionalId,
+        serviceId: ba.serviceId,
+      }),
+      await slots({
+        professionalId: ba.professionalId,
+        serviceId: bb.serviceId,
+      }),
+    ];
+    const ghost = [
+      await slots({ professionalId: GHOST, serviceId: ba.serviceId }),
+      await slots({ professionalId: ba.professionalId, serviceId: GHOST }),
+    ];
+    real.forEach((r, i) => {
+      expect(r.statusCode).toBe(404);
+      expect(norm(r)).toEqual(norm(ghost[i]!));
+    });
+    // mesmo telefone nas duas empresas: dois clientes, cada um na sua
+    const same = { name: "Mesma Pessoa", phone: "(11) 95555-4444" };
+    const a1 = await bookOk(t, A, {
+      ...ba,
+      startsAt: at(MONDAY, "15:00"),
+      customer: same,
+    });
+    const b1 = await bookOk(t, B, {
+      ...bb,
+      startsAt: at(MONDAY, "15:00"),
+      customer: same,
+    });
+    expect(a1.customer.id).not.toBe(b1.customer.id);
+    expect(
+      await t.prisma.customer.count({ where: { phoneE164: "+5511955554444" } }),
+    ).toBe(2);
+  });
+
+  it("organizationId no corpo/query => 400; X-Active-Org de B => 409; nada muda", async () => {
+    const { ba, bb } = await seed();
+    const orgB = await snapshotB();
+    const total = await t.prisma.appointment.count();
+    const body = {
+      ...ba,
+      startsAt: at(MONDAY, "16:00"),
+      customer: newCustomer(8),
+    };
+    const bad = await Promise.all([
+      api(
+        t,
+        "POST",
+        "/api/appointments",
+        A,
+        { ...body, organizationId: orgB.id },
+        { "idempotency-key": randomUUID() },
+      ),
+      api(
+        t,
+        "GET",
+        `/api/appointments?from=${encodeURIComponent(at(MONDAY, "00:00"))}&to=${encodeURIComponent(at("2031-03-05", "00:00"))}&organizationId=${orgB.id}`,
+        A,
+      ),
+      api(
+        t,
+        "GET",
+        `/api/availability/slots?professionalId=${ba.professionalId}&serviceId=${ba.serviceId}&date=${MONDAY}&organizationId=${orgB.id}`,
+        A,
+      ),
+      api(t, "PATCH", `/api/customers/${GHOST}`, A, {
+        organizationId: orgB.id,
+      }),
+    ]);
+    for (const r of bad) expect(r.statusCode).toBe(400);
+    const switched = await Promise.all([
+      api(t, "POST", "/api/appointments", A, body, {
+        "idempotency-key": randomUUID(),
+        "x-active-org": ORG_B_SLUG,
+      }),
+      api(t, "GET", `/api/appointments/${GHOST}`, A, undefined, {
+        "x-active-org": ORG_B_SLUG,
+      }),
+    ]);
+    for (const r of switched) expect(r.statusCode).toBe(409);
+    expect(await t.prisma.appointment.count()).toBe(total);
+    expect((await snapshotOfB(bb)).appointments).toHaveLength(1);
+  });
+
+  it("idempotência: a chave de B é invisível para A (mesma chave, outro pedido => operação nova, sem replay nem 409)", async () => {
+    const { ba, bb } = await seed();
+    const key = randomUUID();
+    const rb = await book(
+      t,
+      B,
+      { ...bb, startsAt: at(MONDAY, "13:00"), customer: newCustomer(20) },
+      key,
+    );
+    expect(rb.statusCode).toBe(201);
+    const ra = await book(
+      t,
+      A,
+      { ...ba, startsAt: at(MONDAY, "13:00"), customer: newCustomer(21) },
+      key,
+    );
+    expect(ra.statusCode).toBe(201);
+    expect(ra.headers["idempotent-replay"]).toBeUndefined();
+    expect(ra.json().appointment.id).not.toBe(rb.json().appointment.id);
+    // e o replay de A devolve o resultado de A, nunca o de B
+    const replay = await book(
+      t,
+      A,
+      { ...ba, startsAt: at(MONDAY, "13:00"), customer: newCustomer(21) },
+      key,
+    );
+    expect(replay.headers["idempotent-replay"]).toBe("true");
+    expect(replay.json().appointment.id).toBe(ra.json().appointment.id);
+  });
+
+  it("sentinela de SQL: consultas a appointments, customers e idempotency_records citam organization_id", async () => {
+    const { ba } = await seed();
+    t.queries.length = 0;
+    const a = await bookOk(t, A, {
+      ...ba,
+      startsAt: at(MONDAY, "16:00"),
+      customer: newCustomer(30),
+    });
+    await api(t, "GET", `/api/appointments/${a.id}`, A);
+    await api(
+      t,
+      "GET",
+      `/api/appointments?from=${encodeURIComponent(at(MONDAY, "00:00"))}&to=${encodeURIComponent(at("2031-03-05", "00:00"))}`,
+      A,
+    );
+    await api(t, "POST", `/api/appointments/${a.id}/reschedule`, A, {
+      startsAt: at(MONDAY, "17:00"),
+      version: 1,
+    });
+    await api(t, "POST", `/api/appointments/${a.id}/confirm`, A, {
+      version: 2,
+    });
+    await api(t, "POST", `/api/appointments/${a.id}/cancel`, A, { version: 3 });
+    await api(t, "POST", `/api/appointments/${a.id}/reactivate`, A, {
+      version: 4,
+    });
+    await api(t, "PATCH", `/api/customers/${a.customer.id}`, A, { notes: "x" });
+    await api(t, "GET", `/api/customers/${a.customer.id}`, B); // alheio
+    await api(
+      t,
+      "GET",
+      `/api/availability/slots?professionalId=${ba.professionalId}&serviceId=${ba.serviceId}&date=${MONDAY}`,
+      A,
+    );
+    for (const table of ["appointments", "customers", "idempotency_records"])
+      expect(
+        t.queries.some((q) => new RegExp(`"${table}"|\\b${table}\\b`).test(q)),
+        table,
+      ).toBe(true);
+    expect(sentinelViolations(t.queries, [])).toEqual([]);
+  });
+});
+
 describe("os detectores realmente detectam (testes dos testes)", () => {
   it("o registro de rotas enxerga rota sem classificação e rota tenant sem ação", async () => {
     const { buildApp } = await import("../../src/app.ts");
@@ -763,10 +1086,14 @@ describe("item 7 — FKs compostas entre tabelas escopadas", () => {
     expect(fks.filter((f) => !f.has_org)).toEqual([]);
   });
 
-  it("schema de produção: as FKs entre tabelas escopadas (vínculo profissional×serviço) são todas compostas", async () => {
+  it("schema de produção: as FKs entre tabelas escopadas são todas compostas", async () => {
     const fks = await nonCompositeTenantFks(TEST_DB);
     expect(fks.filter((f) => !f.has_org)).toEqual([]);
     expect(fks.map((f) => `${f.source}->${f.target}`).sort()).toEqual([
+      "appointments->customers",
+      "appointments->professionals",
+      "appointments->services",
+      "idempotency_records->appointments",
       "professional_services->professionals",
       "professional_services->services",
       "time_off->professionals",
