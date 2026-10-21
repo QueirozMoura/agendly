@@ -1,10 +1,10 @@
 // Base visual da página pública (Etapa 2): cabeçalho, menu e isolamento/tema do CSS.
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Hero } from "../features/landing/Hero";
 import { LandingHeader } from "../features/landing/LandingHeader";
 
@@ -18,6 +18,167 @@ const header = (items?: typeof ITEMS) =>
       <LandingHeader {...(items ? { items } : {})} />
     </MemoryRouter>,
   );
+
+afterEach(() => vi.unstubAllGlobals());
+
+function viewport(width: number) {
+  const listeners = new Set<() => void>();
+  const media = {
+    matches: width >= 1024,
+    addEventListener: (_: string, listener: () => void) =>
+      listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) =>
+      listeners.delete(listener),
+  };
+  vi.stubGlobal("matchMedia", () => media);
+  return (nextWidth: number) =>
+    act(() => {
+      media.matches = nextWidth >= 1024;
+      listeners.forEach((listener) => listener());
+    });
+}
+
+describe("LandingHeader: navegação responsiva", () => {
+  it("sincroniza o link ativo ao navegar pelo histórico de âncoras", () => {
+    header(ITEMS);
+    const previous = window.location.href;
+    try {
+      window.history.replaceState(null, "", "#faq");
+      fireEvent(window, new HashChangeEvent("hashchange"));
+      expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute(
+        "aria-current",
+        "location",
+      );
+      window.history.replaceState(null, "", "#beneficios");
+      fireEvent(window, new HashChangeEvent("hashchange"));
+      expect(screen.getByRole("link", { name: "FAQ" })).not.toHaveAttribute(
+        "aria-current",
+      );
+      expect(screen.getByRole("link", { name: "Benefícios" })).toHaveAttribute(
+        "aria-current",
+        "location",
+      );
+    } finally {
+      window.history.replaceState(null, "", previous);
+    }
+  });
+  it.each([320, 375, 640, 768, 1023])(
+    "em %i px: menu fechado é inacessível; Escape fecha e restaura foco",
+    async (width) => {
+      viewport(width);
+      const user = userEvent.setup();
+      header(ITEMS);
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+      const nav = screen.getByRole("navigation", { hidden: true });
+      expect(nav).toHaveAttribute("inert");
+      const menu = screen.getByRole("button", { name: "Abrir menu" });
+      await user.click(menu);
+      expect(nav).not.toHaveAttribute("inert");
+      await user.tab();
+      expect(screen.getByRole("link", { name: "Benefícios" })).toHaveFocus();
+      await user.keyboard("{Escape}");
+      expect(menu).toHaveFocus();
+      expect(menu).toHaveAttribute("aria-expanded", "false");
+      expect(nav).toHaveAttribute("aria-hidden", "true");
+    },
+  );
+
+  it("fecha ao clicar fora, sem impedir foco em outro controle", async () => {
+    viewport(320);
+    const user = userEvent.setup();
+    header(ITEMS);
+    const menu = screen.getByRole("button", { name: "Abrir menu" });
+    await user.click(menu);
+    await user.tab();
+    const theme = screen.getByRole("button", { name: /^Tema:/ });
+    await user.click(theme);
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(theme).toHaveFocus();
+  });
+
+  it("fecha por Tab sem prender nem devolver o foco", async () => {
+    viewport(375);
+    const user = userEvent.setup();
+    header(ITEMS);
+    const menu = screen.getByRole("button", { name: "Abrir menu" });
+    await user.click(menu);
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole("button", { name: /^Tema:/ })).toHaveFocus();
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("navegar fecha o painel, marca o link e move foco para a seção", async () => {
+    viewport(320);
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LandingHeader items={ITEMS} />
+        <section id="faq">Perguntas</section>
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole("button", { name: "Abrir menu" }));
+    const link = screen.getByRole("link", { name: "FAQ" });
+    await user.click(link);
+    expect(screen.getByRole("button", { name: "Abrir menu" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(link).toHaveAttribute("aria-current", "location");
+    expect(screen.getByText("Perguntas")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByText("Perguntas")).not.toHaveAttribute("tabindex");
+  });
+
+  it.each([1024, 1440])(
+    "em %i px os links ficam acessíveis; voltar a mobile fecha o menu",
+    (width) => {
+      const resize = viewport(width);
+      header(ITEMS);
+      const nav = screen.getByRole("navigation");
+      expect(nav).not.toHaveAttribute("inert");
+      act(() => screen.getByRole("link", { name: "FAQ" }).focus());
+      resize(320);
+      expect(nav).toHaveAttribute("inert");
+      expect(screen.getByRole("button", { name: "Abrir menu" })).toHaveFocus();
+      resize(width);
+      expect(nav).not.toHaveAttribute("inert");
+    },
+  );
+
+  it("usa a altura medida para o deslocamento das âncoras e limpa ao desmontar", () => {
+    let notify: () => void = () => {};
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          notify = callback;
+        }
+        observe() {}
+        disconnect = disconnect;
+      },
+    );
+    const { container, unmount } = render(
+      <MemoryRouter>
+        <div className="landing">
+          <LandingHeader />
+        </div>
+      </MemoryRouter>,
+    );
+    const root = container.querySelector<HTMLElement>(".landing")!;
+    const element = container.querySelector("header")!;
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({
+      height: 124,
+    } as DOMRect);
+    act(() => notify());
+    expect(root.style.getPropertyValue("--l-header-offset")).toBe("140px");
+    unmount();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(root.style.getPropertyValue("--l-header-offset")).toBe("");
+  });
+});
 
 describe("LandingHeader", () => {
   it("tem logo, Entrar (/entrar) e Começar agora (/cadastro)", () => {
@@ -159,20 +320,19 @@ describe("Hero", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: /sem horários em conflito/,
+        name: /Sua agenda em ordem\. Seu negócio em movimento\./,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: /Sua agenda organizada/ }),
+      screen.getByRole("region", { name: /Sua agenda em ordem/ }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Começar agora" })).toHaveAttribute(
       "href",
       "/cadastro",
     );
-    expect(screen.getByRole("link", { name: "Entrar" })).toHaveAttribute(
-      "href",
-      "/entrar",
-    );
+    expect(
+      screen.getByRole("link", { name: "Conhecer funcionalidades" }),
+    ).toHaveAttribute("href", "#funcionalidades");
   });
 
   it("a demonstração é uma figura rotulada como ilustrativa, sem controles e sem tabulação", () => {
@@ -195,5 +355,22 @@ describe("Hero", () => {
       expect(container.textContent).toContain(status);
     expect(container.querySelectorAll("h1")).toHaveLength(1);
     expect(container.querySelectorAll("h2, h3, h4")).toHaveLength(0);
+  });
+
+  it("organiza horários e serviços de um profissional, destacando o confirmado", () => {
+    const { container } = hero();
+    expect(screen.getByText("Rafael")).toBeInTheDocument();
+    const rows = container.querySelectorAll(".landing-preview-row");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent("09:00");
+    expect(rows[0]).toHaveTextContent("09:30");
+    const confirmed = container.querySelector(".landing-appt.is-confirmed");
+    expect(confirmed).toHaveTextContent("Confirmado");
+    expect(confirmed).toHaveTextContent("Lucas Oliveira");
+    expect(confirmed).toHaveTextContent("Corte e barba");
+    expect(confirmed).toHaveTextContent("40 min + 10 min de intervalo");
+    expect(
+      container.querySelectorAll("[role=button], [role=tab], select, input"),
+    ).toHaveLength(0);
   });
 });

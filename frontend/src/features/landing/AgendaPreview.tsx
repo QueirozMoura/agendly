@@ -1,31 +1,31 @@
-/**
- * Representação ESTÁTICA da agenda do painel (visão do dia, agrupada por profissional), só com elementos que existem
- * na tela real (`features/agenda`): alternância Dia/Semana, horários, nome do cliente, serviço com duração, intervalo e
- * preço, e os status Agendado/Confirmado/Cancelado. Os dados são fictícios e a própria figura avisa. Não chama a API
- * e não tem controles: é ilustração, então fica fora da ordem de tabulação e do leitor de tela (a descrição está no
- * rótulo da figura).
- */
+/** Dados fictícios, sem API ou controles: uma ilustração da agenda por profissional. */
 const EXEMPLOS = [
   {
-    time: "09:00–09:30",
+    start: "09:00",
+    end: "09:30",
     status: "Agendado",
     tone: "scheduled",
-    customer: "Cliente A",
-    detail: "Serviço 1 · 30 min",
+    customer: "Marina Costa",
+    service: "Corte de cabelo",
+    detail: "30 min",
   },
   {
-    time: "10:00–10:50",
+    start: "10:00",
+    end: "10:50",
     status: "Confirmado",
     tone: "confirmed",
-    customer: "Cliente B",
-    detail: "Serviço 2 · 40 min + 10 min de intervalo · R$\u00a080,00",
+    customer: "Lucas Oliveira",
+    service: "Corte e barba",
+    detail: "40 min + 10 min de intervalo",
   },
   {
-    time: "11:30–12:00",
+    start: "11:30",
+    end: "12:00",
     status: "Cancelado",
     tone: "cancelled",
-    customer: "Cliente C",
-    detail: "Serviço 1 · 30 min",
+    customer: "Pedro Santos",
+    service: "Corte de cabelo",
+    detail: "30 min",
   },
 ] as const;
 
@@ -34,29 +34,66 @@ export function AgendaPreview() {
     <figure
       className="landing-preview"
       role="img"
-      aria-label="Exemplo ilustrativo da agenda do Agendly: visão do dia com horários de um profissional, cada um com cliente, serviço e status."
+      aria-label="Exemplo ilustrativo da agenda do Agendly, com dados fictícios: visão do dia de Rafael, com horários, clientes e serviços. Um atendimento agendado às 09:00, um confirmado às 10:00 e um cancelado às 11:30."
     >
-      <div aria-hidden="true">
+      <div className="landing-preview-window" aria-hidden="true">
         <div className="landing-preview-bar">
-          <span className="landing-preview-title">Agenda</span>
-          <span className="landing-preview-segmented">
-            <span className="landing-preview-seg is-on">Dia</span>
-            <span className="landing-preview-seg">Semana</span>
+          <span className="landing-preview-wordmark">
+            Agendly<span> / Agenda</span>
+          </span>
+          <span className="landing-preview-window-dots">
+            <i />
+            <i />
+            <i />
           </span>
         </div>
-        <div className="landing-preview-pro">Profissional 1</div>
-        <ul className="landing-preview-list">
-          {EXEMPLOS.map((e) => (
-            <li key={e.time} className={`landing-appt is-${e.tone}`}>
-              <div className="landing-appt-head">
-                <strong>{e.time}</strong>
-                <span className="landing-badge">{e.status}</span>
-              </div>
-              <div>{e.customer}</div>
-              <div className="landing-appt-detail">{e.detail}</div>
-            </li>
-          ))}
-        </ul>
+        <div className="landing-preview-body">
+          <div className="landing-preview-heading">
+            <div>
+              <span className="landing-preview-kicker">
+                Sua agenda, de perto
+              </span>
+              <div className="landing-preview-title">25 de outubro</div>
+              <span className="landing-preview-year">2026 · Visão do dia</span>
+            </div>
+            <span className="landing-preview-date">
+              <strong>25</strong>OUT
+            </span>
+          </div>
+          <div className="landing-preview-pro">
+            <span className="landing-preview-avatar">R</span>
+            <span>
+              <small>Profissional</small>
+              <strong>Rafael</strong>
+            </span>
+          </div>
+          <ul className="landing-preview-list">
+            {EXEMPLOS.map((example) => (
+              <li
+                key={example.start}
+                className={`landing-preview-row is-${example.tone}`}
+              >
+                <div className="landing-preview-time">
+                  <strong>{example.start}</strong>
+                  <span>{example.end}</span>
+                </div>
+                <div className={`landing-appt is-${example.tone}`}>
+                  <div className="landing-appt-head">
+                    <span className="landing-badge">{example.status}</span>
+                    {example.tone === "confirmed" && (
+                      <span className="landing-appt-check">✓</span>
+                    )}
+                  </div>
+                  <strong className="landing-appt-customer">
+                    {example.customer}
+                  </strong>
+                  <div className="landing-appt-service">{example.service}</div>
+                  <div className="landing-appt-detail">{example.detail}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <figcaption className="landing-preview-note">
         Exemplo ilustrativo, com dados fictícios.

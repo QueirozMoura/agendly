@@ -2,83 +2,140 @@
  * Estilos da página pública. Tudo vive sob `.landing` / `.landing-*`: nenhum seletor global e nenhuma alteração nos
  * tokens do painel (styles.css). Claro por padrão; escuro por `prefers-color-scheme` ou pela escolha manual (`data-theme` em <html>, lib/theme.ts), como o resto do app.
  */
+/* Fonte local, carregada apenas quando usada; licença e origem em fonts/. */
+@font-face {
+  font-family: "Agendly Landing Manrope";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("./fonts/manrope-latin-variable.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
 .landing {
-  --l-bg: #f8faf9;
+  --l-bg: #f7f8fd;
   --l-surface: #ffffff;
-  --l-text: #14201f;
-  --l-muted: #4a5b59;
-  --l-border: #d3dedc;
-  --l-control-border: #6b8582; /* borda de botões: ≥ 3:1 sobre o fundo (WCAG 1.4.11) */
-  --l-accent: #0f766e; /* verde-petróleo */
-  --l-accent-hover: #0b5f58;
+  --l-surface-raised: #eef1fa;
+  --l-text: #10162f;
+  --l-muted: #56617a;
+  --l-border: #dce1ef;
+  --l-control-border: #7a839a;
+  --l-accent: #4f46e5;
+  --l-accent-hover: #4338ca;
+  --l-violet: #7c3aed;
   --l-accent-text: #ffffff;
-  --l-focus: #0f766e;
-  --l-header-bg: rgb(248 250 249 / 0.9);
-  --l-hero-glow: #e3f3f0;
-  --l-ok-bg: #dcf1ee;
-  --l-ok-text: #0b5f58;
-  --l-neutral-bg: #e9efee;
-  --l-neutral-text: #2f4a47;
-  --l-off-bg: #f6e6e6;
-  --l-off-text: #6b3a3a;
-  --l-shadow: 0 12px 32px rgb(15 118 110 / 0.14);
-  --l-radius: 10px;
-  --l-gutter: 1rem;
+  --l-primary-start: #4338ca;
+  --l-primary-end: #6d28d9;
+  --l-primary-hover-start: #3730a3;
+  --l-primary-hover-end: #5b21b6;
+  --l-primary-border: #4338ca;
+  --l-focus: #4f46e5;
+  --l-header-bg: rgb(247 248 253 / 0.94);
+  --l-hero-glow: #ede9fe;
+  --l-ok-bg: #ede9fe;
+  --l-ok-text: #5b21b6;
+  --l-neutral-bg: #e8edfb;
+  --l-neutral-text: #334579;
+  --l-off-bg: #fbe9ed;
+  --l-off-text: #8b2944;
+  --l-shadow-sm: 0 2px 6px rgb(16 22 47 / 0.06);
+  --l-shadow: 0 16px 48px rgb(35 32 88 / 0.12);
+  --l-shadow-control: 0 4px 12px rgb(67 56 202 / 0.18);
+  --l-font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --l-font-heading: "Agendly Landing Manrope", var(--l-font-body);
+  --l-radius-sm: 8px;
+  --l-radius: 12px;
+  --l-radius-card: 20px;
+  --l-radius-preview: 28px;
+  --l-space-xs: 0.25rem;
+  --l-space-sm: 0.5rem;
+  --l-space-md: 0.75rem;
+  --l-space-lg: 1rem;
+  --l-space-xl: 1.5rem;
+  --l-space-xxl: 2rem;
+  --l-space-section: 3rem;
+  --l-space-section-wide: 4.5rem;
+  --l-control-size: 2.75rem;
+  --l-container: 72rem;
+  --l-gutter: var(--l-space-lg);
 
   min-height: 100vh;
   background: var(--l-bg);
   color: var(--l-text);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+  font-family: var(--l-font-body);
   line-height: 1.55;
 }
 :root[data-theme="dark"] .landing {
-  --l-bg: #0d1716;
-  --l-surface: #14211f;
-  --l-text: #e6f0ee;
-  --l-muted: #a6b9b6;
-  --l-border: #2a3d3a;
-  --l-control-border: #5d7f7b;
-  --l-accent: #2dd4bf;
-  --l-accent-hover: #5eead4;
-  --l-accent-text: #04201c;
-  --l-focus: #5eead4;
-  --l-header-bg: rgb(13 23 22 / 0.9);
-  --l-hero-glow: #10302c;
-  --l-ok-bg: #12312d;
-  --l-ok-text: #5eead4;
-  --l-neutral-bg: #1d2f2c;
-  --l-neutral-text: #c3d3d0;
-  --l-off-bg: #3a2020;
-  --l-off-text: #f0b4b4;
-  --l-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  --l-bg: #080d1b;
+  --l-surface: #10172b;
+  --l-surface-raised: #17213a;
+  --l-text: #f3f5ff;
+  --l-muted: #a7b1cb;
+  --l-border: #28344e;
+  --l-control-border: #657493;
+  --l-accent: #a5b4fc;
+  --l-accent-hover: #c7d2fe;
+  --l-violet: #a78bfa;
+  --l-accent-text: #ffffff;
+  --l-primary-start: #4338ca;
+  --l-primary-end: #6d28d9;
+  --l-primary-hover-start: #3730a3;
+  --l-primary-hover-end: #5b21b6;
+  --l-primary-border: #a5b4fc;
+  --l-focus: #a5b4fc;
+  --l-header-bg: rgb(8 13 27 / 0.94);
+  --l-hero-glow: #1e1b42;
+  --l-ok-bg: #2d2250;
+  --l-ok-text: #d8c5ff;
+  --l-neutral-bg: #202d4a;
+  --l-neutral-text: #c7d2fe;
+  --l-off-bg: #3b2034;
+  --l-off-text: #f9b4c8;
+  --l-shadow-sm: 0 2px 6px rgb(0 0 0 / 0.2);
+  --l-shadow: 0 16px 48px rgb(0 0 0 / 0.35);
+  --l-shadow-control: 0 4px 16px rgb(0 0 0 / 0.28);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) .landing {
-    --l-bg: #0d1716;
-    --l-surface: #14211f;
-    --l-text: #e6f0ee;
-    --l-muted: #a6b9b6;
-    --l-border: #2a3d3a;
-    --l-control-border: #5d7f7b;
-    --l-accent: #2dd4bf;
-    --l-accent-hover: #5eead4;
-    --l-accent-text: #04201c;
-    --l-focus: #5eead4;
-    --l-header-bg: rgb(13 23 22 / 0.9);
-    --l-hero-glow: #10302c;
-    --l-ok-bg: #12312d;
-    --l-ok-text: #5eead4;
-    --l-neutral-bg: #1d2f2c;
-    --l-neutral-text: #c3d3d0;
-    --l-off-bg: #3a2020;
-    --l-off-text: #f0b4b4;
-    --l-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+    --l-bg: #080d1b;
+    --l-surface: #10172b;
+    --l-surface-raised: #17213a;
+    --l-text: #f3f5ff;
+    --l-muted: #a7b1cb;
+    --l-border: #28344e;
+    --l-control-border: #657493;
+    --l-accent: #a5b4fc;
+    --l-accent-hover: #c7d2fe;
+    --l-violet: #a78bfa;
+    --l-accent-text: #ffffff;
+    --l-primary-start: #4338ca;
+    --l-primary-end: #6d28d9;
+    --l-primary-hover-start: #3730a3;
+    --l-primary-hover-end: #5b21b6;
+    --l-primary-border: #a5b4fc;
+    --l-focus: #a5b4fc;
+    --l-header-bg: rgb(8 13 27 / 0.94);
+    --l-hero-glow: #1e1b42;
+    --l-ok-bg: #2d2250;
+    --l-ok-text: #d8c5ff;
+    --l-neutral-bg: #202d4a;
+    --l-neutral-text: #c7d2fe;
+    --l-off-bg: #3b2034;
+    --l-off-text: #f9b4c8;
+    --l-shadow-sm: 0 2px 6px rgb(0 0 0 / 0.2);
+    --l-shadow: 0 16px 48px rgb(0 0 0 / 0.35);
+    --l-shadow-control: 0 4px 16px rgb(0 0 0 / 0.28);
   }
+}
+
+.landing h1,
+.landing h2,
+.landing h3,
+.landing-brand {
+  font-family: var(--l-font-heading);
+  font-weight: 700;
 }
 
 .landing :focus-visible {
@@ -86,23 +143,33 @@
   outline-offset: 2px;
 }
 
-/* Cabeçalho */
+/* Header: superfície opaca como fallback para navegadores sem backdrop-filter. */
 .landing-header {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--l-header-bg);
-  backdrop-filter: blur(8px);
+  background: var(--l-bg);
   border-bottom: 1px solid var(--l-border);
+  box-shadow: var(--l-shadow-sm);
+}
+@supports (
+  (backdrop-filter: blur(16px)) or (-webkit-backdrop-filter: blur(16px))
+) {
+  .landing-header {
+    background: var(--l-header-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(130%);
+    backdrop-filter: blur(16px) saturate(130%);
+  }
 }
 .landing-header-bar {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  max-width: 72rem;
+  gap: var(--l-space-md);
+  max-width: var(--l-container);
   margin: 0 auto;
-  padding: 0.75rem var(--l-gutter);
+  padding: var(--l-space-md) var(--l-gutter);
 }
 .landing-brand {
   font-weight: 700;
@@ -111,23 +178,113 @@
   text-decoration: none;
   color: var(--l-accent);
 }
+.landing-header-brand {
+  letter-spacing: -0.035em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: var(--l-control-size);
+  color: var(--l-text);
+  font-size: 1.4rem;
+  flex: none;
+}
+.landing-brand-symbol {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    var(--l-primary-start),
+    var(--l-primary-end)
+  );
+  box-shadow: var(--l-shadow-control);
+}
+.landing-brand-symbol span {
+  width: 0.75rem;
+  height: 0.875rem;
+  border: 2px solid white;
+  border-radius: 3px;
+  border-top-width: 5px;
+  transform: rotate(-12deg);
+}
 .landing-nav {
-  display: none;
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: var(--l-gutter);
+  right: var(--l-gutter);
+  padding: var(--l-space-sm);
+  gap: var(--l-space-xs);
+  max-height: calc(100dvh - var(--l-header-offset, 9rem) - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--l-surface);
+  border: 1px solid var(--l-border);
+  border-radius: var(--l-radius-card);
+  box-shadow: var(--l-shadow);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 180ms;
+}
+.landing-nav[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
 }
 .landing-nav a {
-  padding: 0.5rem 0.25rem;
+  display: flex;
+  align-items: center;
+  min-height: var(--l-control-size);
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--l-radius-sm);
   text-decoration: none;
   color: var(--l-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
-.landing-nav a:hover {
+.landing-nav a:hover,
+.landing-nav a:focus-visible {
+  background: var(--l-surface-raised);
   color: var(--l-text);
+}
+.landing-nav a:active,
+.landing-nav a[aria-current="location"] {
+  color: var(--l-accent);
+  background: var(--l-surface-raised);
+  text-decoration: underline;
+  text-underline-offset: 0.35em;
+  text-decoration-thickness: 2px;
 }
 .landing-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-left: auto;
-  order: 2;
+  gap: var(--l-space-sm);
+  width: 100%;
+  order: 3;
+  min-width: 0;
+}
+.landing-actions .landing-button {
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+.landing-actions .landing-primary {
+  flex: 1;
+}
+.landing-actions .landing-signin {
+  background: transparent;
 }
 
 /* Botões */
@@ -135,7 +292,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
+  min-height: var(--l-control-size);
   padding: 0 1rem;
   border: 1px solid var(--l-control-border);
   border-radius: var(--l-radius);
@@ -147,146 +304,215 @@
   cursor: pointer;
 }
 .landing .theme-button {
+  width: var(--l-control-size);
+  height: var(--l-control-size);
+  border-radius: var(--l-radius);
   border-color: var(--l-control-border);
   background: var(--l-surface);
   color: var(--l-text);
 }
-.landing .theme-button:hover {
-  border-color: var(--l-accent);
-}
+.landing .theme-button:hover,
+.landing-menu:hover,
 .landing-button:hover {
   border-color: var(--l-accent);
+  background: var(--l-surface-raised);
+}
+.landing .theme-button:active,
+.landing-menu:active,
+.landing-button:active {
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.12);
 }
 .landing-primary {
-  background: var(--l-accent);
-  border-color: var(--l-accent);
+  background: linear-gradient(
+    115deg,
+    var(--l-primary-start),
+    var(--l-primary-end)
+  );
+  border-color: var(--l-primary-border);
   color: var(--l-accent-text);
+  box-shadow: var(--l-shadow-control);
 }
 .landing-primary:hover {
-  background: var(--l-accent-hover);
-  border-color: var(--l-accent-hover);
+  background: linear-gradient(
+    115deg,
+    var(--l-primary-hover-start),
+    var(--l-primary-hover-end)
+  );
+  border-color: var(--l-primary-border);
 }
 
-/* Botão do menu (só existe quando há links de seção) */
-.landing-menu {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--l-control-border);
-  border-radius: var(--l-radius);
-  background: var(--l-surface);
-  color: var(--l-text);
-  font-size: 1.1rem;
-  cursor: pointer;
-  order: 3; /* visualmente depois dos botões; no DOM vem antes da navegação */
-}
-
-/* Celular: o menu abre como painel sob a barra */
-.landing-nav[data-open="true"] {
-  display: flex;
-  flex-direction: column;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  padding: 0.5rem var(--l-gutter) 1rem;
-  background: var(--l-bg);
-  border-bottom: 1px solid var(--l-border);
-}
-/* Telas estreitas: barra mais compacta para brand + tema + 2 botões + menu caberem a 375 px */
+/* Botão de divulgação: antes dos links na ordem de tabulação. */
+/* Preserva a regra dos controles fora do header estabelecida na fundação. */
 @media (max-width: 479px) {
-  .landing-header-bar {
-    gap: 0.375rem;
-  }
-  .landing-brand {
-    font-size: 1rem;
-  }
-  .landing-actions {
-    gap: 0.25rem;
-  }
   .landing-button {
     padding: 0 0.5rem;
     white-space: nowrap;
   }
-  .landing .theme-button {
-    width: 2.25rem;
-  }
 }
-
-/* Muito estreito (≤ 372 px): com o menu, brand + tema + 2 botões + menu não cabem numa linha; os botões descem para a segunda */
-@media (max-width: 372px) {
+.landing-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--l-control-size);
+  height: var(--l-control-size);
+  flex: none;
+  margin-left: auto;
+  border: 1px solid var(--l-control-border);
+  border-radius: var(--l-radius);
+  background: var(--l-surface);
+  color: var(--l-text);
+  cursor: pointer;
+}
+.landing-menu-lines,
+.landing-menu-lines::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 180ms ease;
+}
+.landing-menu-lines {
+  transform: translateY(-3px);
+}
+.landing-menu-lines::after {
+  content: "";
+  transform: translateY(6px);
+}
+.landing-menu[aria-expanded="true"] .landing-menu-lines {
+  transform: rotate(45deg);
+}
+.landing-menu[aria-expanded="true"] .landing-menu-lines::after {
+  transform: rotate(-90deg);
+}
+@media (min-width: 640px) {
   .landing-header-bar {
-    flex-wrap: wrap;
-  }
-  .landing-menu {
-    order: 2;
-    margin-left: auto;
+    flex-wrap: nowrap;
   }
   .landing-actions {
+    width: auto;
+    margin-left: auto;
+    order: 2;
+  }
+  .landing-menu {
     order: 3;
-    width: 100%;
     margin-left: 0;
   }
-  .landing-actions .landing-button {
-    flex: 1;
-  }
-  .landing-nav[data-open="true"] {
-    top: 100%;
-  }
 }
-
 @media (min-width: 880px) {
   .landing {
-    --l-gutter: 1.5rem;
+    --l-gutter: var(--l-space-xl);
   }
+}
+@media (min-width: 1024px) {
   .landing-nav,
   .landing-nav[data-open="true"] {
-    display: flex;
     flex-direction: row;
     position: static;
     padding: 0;
-    gap: 1.25rem;
+    gap: 0.125rem;
+    margin-left: auto;
+    max-height: none;
+    overflow: visible;
     background: none;
     border: 0;
-    margin-left: 1rem;
+    border-radius: 0;
+    box-shadow: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition: none;
+  }
+  .landing-nav a {
+    padding-inline: 0.625rem;
+    white-space: nowrap;
   }
   .landing-menu {
     display: none;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  .landing-nav,
+  .landing-nav a,
+  .landing-menu-lines,
+  .landing-menu-lines::after {
+    transition: none;
+  }
+}
 
-/* Hero */
+/* Hero: luz estática e linhas de agenda, sem animação por rolagem. */
 .landing-hero {
-  background: radial-gradient(
-    ellipse at 80% 0%,
-    var(--l-hero-glow),
-    transparent 60%
-  );
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 95% 25%, var(--l-hero-glow), transparent 60%),
+    radial-gradient(
+      ellipse at 0% 100%,
+      var(--l-surface-raised),
+      transparent 55%
+    );
+}
+.landing-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: linear-gradient(var(--l-border) 1px, transparent 1px);
+  background-size: 100% 5rem;
+  mask-image: linear-gradient(to right, transparent 35%, black);
 }
 .landing-hero-inner {
   display: grid;
-  gap: 2.5rem;
-  max-width: 72rem;
+  gap: 3rem;
+  max-width: var(--l-container);
   margin: 0 auto;
-  padding: 2.5rem var(--l-gutter) 3.5rem;
+  padding: 3rem var(--l-gutter) 4rem;
+}
+.landing-hero-copy,
+.landing-hero-visual {
+  min-width: 0;
+}
+.landing-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0 0 1.5rem;
+  color: var(--l-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+.landing-hero-eyebrow span {
+  width: 0.625rem;
+  height: 0.625rem;
+  flex: none;
+  border-radius: 3px;
+  background: var(--l-accent);
+  box-shadow: 4px -4px 0 var(--l-border);
 }
 .landing-hero-copy h1 {
-  margin: 0 0 1rem;
-  font-size: clamp(2rem, 7vw, 3.25rem);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
+  margin: 0 0 1.5rem;
+  max-width: 13ch;
+  font-size: clamp(2.25rem, 5.5vw, 4.25rem);
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: -0.05em;
+  overflow-wrap: break-word;
 }
 .landing-hero-copy h1 span {
   color: var(--l-accent);
 }
 .landing-lead {
-  margin: 0 0 1.75rem;
+  margin: 0 0 2rem;
   max-width: 34rem;
-  font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+  line-height: 1.75;
   color: var(--l-muted);
 }
+/* Compartilhados com o CTA final: mantém suas dimensões anteriores. */
 .landing-hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -297,71 +523,187 @@
   padding: 0 1.5rem;
   font-size: 1.05rem;
 }
-
-/* Demonstração estática da agenda */
+.landing-hero-copy .landing-button {
+  gap: 0.75rem;
+  white-space: normal;
+  text-align: center;
+  padding: 0.875rem 1.125rem;
+  font-size: 0.9375rem;
+  transition:
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+.landing-hero-copy .landing-primary:hover {
+  box-shadow: var(--l-shadow);
+}
+.landing-hero-secondary {
+  background: var(--l-surface);
+}
+.landing-hero-assurance {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+  color: var(--l-muted);
+  font-size: 0.8125rem;
+  max-width: 32rem;
+}
+.landing-hero-assurance span {
+  color: var(--l-accent);
+}
+.landing-hero-visual {
+  position: relative;
+  width: 100%;
+  max-width: 35rem;
+  justify-self: center;
+}
+/* Demonstração estática: relógio à esquerda, atendimento à direita. */
 .landing-preview {
+  position: relative;
+  isolation: isolate;
   margin: 0;
-  padding: 1rem;
+}
+.landing-preview-window {
   background: var(--l-surface);
   border: 1px solid var(--l-border);
-  border-radius: 14px;
+  border-radius: var(--l-radius-preview);
   box-shadow: var(--l-shadow);
+  overflow: hidden;
 }
 .landing-preview-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--l-surface-raised);
+  border-bottom: 1px solid var(--l-border);
+}
+.landing-preview-wordmark {
+  font-family: var(--l-font-heading);
+  font-size: 0.875rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+.landing-preview-wordmark span {
+  color: var(--l-muted);
+  font-weight: 600;
+}
+.landing-preview-window-dots {
+  display: flex;
+  gap: 0.25rem;
+}
+.landing-preview-window-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--l-control-border);
+}
+.landing-preview-body {
+  padding: 1.25rem;
+}
+.landing-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
 }
-.landing-preview-title {
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-.landing-preview-segmented {
-  display: inline-flex;
-  border: 1px solid var(--l-control-border);
-  border-radius: 8px;
-  overflow: hidden;
-  font-size: 0.85rem;
-}
-.landing-preview-seg {
-  padding: 0.25rem 0.75rem;
+.landing-preview-kicker,
+.landing-preview-year {
+  font-size: 0.75rem;
   color: var(--l-muted);
 }
-.landing-preview-seg.is-on {
-  background: var(--l-accent);
-  color: var(--l-accent-text);
-  font-weight: 600;
+.landing-preview-title {
+  font-family: var(--l-font-heading);
+  font-weight: 750;
+  font-size: clamp(1.25rem, 2.5vw, 1.625rem);
+  letter-spacing: -0.035em;
+  margin-block: 0.125rem;
+}
+.landing-preview-date {
+  display: grid;
+  justify-items: center;
+  min-width: 3rem;
+  padding: 0.375rem;
+  border: 1px solid var(--l-border);
+  border-radius: var(--l-radius);
+  background: var(--l-surface-raised);
+  color: var(--l-muted);
+  font-size: 0.625rem;
+  letter-spacing: 0.05em;
+}
+.landing-preview-date strong {
+  color: var(--l-text);
+  font-family: var(--l-font-heading);
+  font-size: 1.375rem;
 }
 .landing-preview-pro {
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1.25rem;
+}
+.landing-preview-avatar {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--l-neutral-bg);
+  color: var(--l-neutral-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.landing-preview-pro small,
+.landing-preview-pro strong {
+  display: block;
+  font-size: 0.75rem;
+}
+.landing-preview-pro small {
   color: var(--l-muted);
 }
 .landing-preview-list {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.landing-appt {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--l-border);
-  border-left: 4px solid var(--l-accent);
-  border-radius: 8px;
-  font-size: 0.95rem;
+.landing-preview-row {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 0.625rem;
 }
-.landing-appt.is-scheduled {
-  border-left-color: var(--l-control-border);
-}
-.landing-appt.is-cancelled {
-  border-left-color: var(--l-off-text);
+.landing-preview-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 0.75rem;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
   color: var(--l-muted);
 }
-.landing-appt.is-cancelled strong {
+.landing-preview-time strong {
+  font-size: 0.8125rem;
+  color: var(--l-text);
+}
+.landing-appt {
+  padding: 0.875rem 1rem;
+  background: var(--l-bg);
+  border: 1px solid var(--l-border);
+  border-left: 3px solid var(--l-control-border);
+  border-radius: var(--l-radius);
+  overflow-wrap: anywhere;
+}
+.landing-appt.is-confirmed {
+  background: var(--l-surface-raised);
+  border-color: var(--l-accent);
+  border-left-width: 4px;
+  box-shadow: var(--l-shadow-control);
+}
+.landing-appt.is-cancelled .landing-appt-customer {
+  color: var(--l-muted);
   text-decoration: line-through;
 }
 .landing-appt-head {
@@ -369,17 +711,31 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.landing-appt-check {
+  color: var(--l-accent);
+  font-size: 0.875rem;
+}
+.landing-appt-customer {
+  display: block;
+  font-size: 0.9375rem;
+  letter-spacing: -0.015em;
+}
+.landing-appt-service {
+  font-size: 0.8125rem;
+  margin-top: 0.125rem;
 }
 .landing-appt-detail {
-  font-size: 0.85rem;
+  margin-top: 0.375rem;
+  font-size: 0.6875rem;
   color: var(--l-muted);
 }
 .landing-badge {
-  padding: 0.05rem 0.5rem;
+  padding: 0.125rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  white-space: nowrap;
 }
 .landing-appt.is-scheduled .landing-badge {
   background: var(--l-neutral-bg);
@@ -394,26 +750,67 @@
   color: var(--l-off-text);
 }
 .landing-preview-note {
-  margin-top: 0.75rem;
-  font-size: 0.8rem;
+  margin-top: 1rem;
+  font-size: 0.75rem;
   text-align: center;
   color: var(--l-muted);
 }
-
-@media (min-width: 880px) {
+@media (max-width: 479px) {
+  .landing-hero-copy .landing-button {
+    width: 100%;
+  }
+  .landing-preview-body {
+    padding: 1rem 0.75rem;
+  }
+  .landing-appt {
+    padding: 0.75rem;
+  }
+}
+@media (min-width: 640px) {
   .landing-hero-inner {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    padding-top: 4rem;
+    padding-bottom: 5rem;
+  }
+  .landing-hero-copy h1 {
+    max-width: 17ch;
+  }
+  .landing-preview::before {
+    content: "";
+    position: absolute;
+    inset: 1.5rem -0.625rem 3rem 1rem;
+    z-index: -1;
+    border: 1px solid var(--l-border);
+    border-radius: var(--l-radius-preview);
+    background: var(--l-surface-raised);
+    transform: rotate(2deg);
+    pointer-events: none;
+  }
+}
+@media (min-width: 1024px) {
+  .landing-hero-inner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
     align-items: center;
     gap: 3rem;
-    padding-top: 4.5rem;
-    padding-bottom: 5rem;
+    padding-top: 5rem;
+    padding-bottom: 6rem;
+  }
+  .landing-hero-copy h1 {
+    max-width: 13ch;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-copy .landing-button {
+    transition: none;
   }
 }
 
 /* Seções de conteúdo */
 .landing-section {
-  padding: 3rem 0;
-  scroll-margin-top: 4.5rem; /* o header fixo não cobre o título ao ir para a âncora */
+  padding: var(--l-space-section) 0;
+  scroll-margin-top: var(
+    --l-header-offset,
+    9rem
+  ); /* medido pelo header; fallback conservador */
 }
 .landing-band {
   background: var(--l-surface);
@@ -421,7 +818,7 @@
   border-bottom: 1px solid var(--l-border);
 }
 .landing-container {
-  max-width: 72rem;
+  max-width: var(--l-container);
   margin: 0 auto;
   padding: 0 var(--l-gutter);
 }
@@ -444,7 +841,8 @@
   background: var(--l-surface);
   border: 1px solid var(--l-border);
   border-top: 3px solid var(--l-accent);
-  border-radius: var(--l-radius);
+  border-radius: var(--l-radius-card);
+  box-shadow: var(--l-shadow-sm);
 }
 .landing-band .landing-card {
   background: var(--l-bg);
@@ -483,7 +881,7 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 50%;
-  background: var(--l-accent);
+  background: var(--l-primary-start);
   color: var(--l-accent-text);
   font-weight: 700;
 }
@@ -495,7 +893,7 @@
 }
 @media (min-width: 880px) {
   .landing-section {
-    padding: 4.5rem 0;
+    padding: var(--l-space-section-wide) 0;
   }
   .landing-steps {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -567,7 +965,7 @@
     var(--l-surface) 80%
   );
   border: 1px solid var(--l-border);
-  border-radius: 16px;
+  border-radius: var(--l-radius-card);
 }
 .landing-cta h2 {
   margin: 0 0 0.75rem;

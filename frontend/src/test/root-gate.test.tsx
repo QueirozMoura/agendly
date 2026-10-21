@@ -7,7 +7,7 @@ import { ANA, makeOrg, makeState } from "./fakeBackend";
 import { currentPath, renderApp } from "./render";
 
 const PASSWORD = "uma-senha-bem-longa-9X";
-const PUBLIC_TEXT = /sem horários em conflito/;
+const PUBLIC_TEXT = /Sua agenda em ordem/;
 
 describe("portaria de /", () => {
   it("visitante anônimo vê o placeholder público, com os botões Entrar e Começar agora", async () => {
