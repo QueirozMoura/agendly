@@ -2,319 +2,397 @@
 
 # Agendly
 
-**Plataforma multiempresa de agendamento para negócios de atendimento: agenda, clientes, serviços, profissionais e confirmação pelo WhatsApp em um único painel.**
+**Agenda, serviços, profissionais e disponibilidade para negócios que atendem com hora marcada.**
 
-![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white)
+Aplicação Full Stack multiempresa, com regras de agendamento no servidor e proteção contra sobreposição no PostgreSQL.
+
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white)
 ![Fastify](https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
-![Vitest](https://img.shields.io/badge/testes-Vitest-6E9F18?logo=vitest&logoColor=white)
 
-[Visão geral](#visão-geral) ·
-[Funcionalidades](#funcionalidades) ·
-[Stack](#stack-tecnológica) ·
-[Arquitetura](#arquitetura) ·
-[Decisões de engenharia](#desafios-técnicos-e-decisões-de-engenharia) ·
-[Execução local](#instalação-e-execução-local) ·
-[Testes](#testes-e-qualidade) ·
-[Deploy](#deploy) ·
-[Limitações](#limitações-e-próximos-passos)
+[Visão geral](#visão-geral) · [Funcionalidades](#funcionalidades) · [Demonstração](#demonstração-visual) · [Stack](#stack-tecnológica) · [Arquitetura](#arquitetura) · [Decisões técnicas](#desafios-técnicos-e-decisões-de-engenharia)
+
+[Execução local](#instalação-e-execução-local) · [Ambiente](#variáveis-de-ambiente) · [Testes](#testes-e-qualidade) · [Deploy](#deploy) · [Limitações](#limitações-e-próximos-passos) · [Autor](#autor)
 
 </div>
 
----
+> **Demonstração em produção:** o endereço público do frontend ainda não está registrado nos arquivos versionados. A configuração de publicação disponível está descrita em [Deploy](#deploy).
 
 ## Visão geral
 
-Pequenos negócios que vivem de hora marcada (clínicas, estúdios, barbearias, consultórios) costumam controlar a agenda em
-cadernos, planilhas e conversas de WhatsApp. O resultado são horários sobrepostos, clientes duplicados e confirmações feitas
-à mão.
+O Agendly centraliza a operação de pequenos negócios de atendimento, como estúdios, barbearias e consultórios: cadastro de serviços e profissionais, expediente semanal, folgas, contatos dos clientes e agenda de atendimentos.
 
-O **Agendly** centraliza esse fluxo em um painel web. O proprietário cria sua empresa, cadastra serviços (duração, buffer e
-preço), profissionais, horários de trabalho e folgas, e passa a marcar atendimentos para os clientes. O sistema calcula os
-horários livres, impede conflitos e prepara a mensagem de confirmação para ser enviada pelo WhatsApp.
+O responsável cria uma empresa, configura seus serviços e a disponibilidade dos profissionais e passa a agendar pelo painel. A aplicação calcula horários livres, revalida as regras ao salvar e prepara mensagens de confirmação para envio manual pelo WhatsApp.
 
-- **Público-alvo:** o dono (ou responsável) de um negócio de atendimento. No estado atual, o proprietário é o único papel
-  operacional; profissionais e clientes não têm conta.
-- **Multiempresa:** um mesmo usuário pode ser proprietário de várias empresas, com dados isolados entre elas.
-- **Idioma:** interface em português brasileiro.
-
-> **Demonstração em produção:** o frontend está publicado na Vercel e a API no Render (ver [Deploy](#deploy)). O endereço
-> público da aplicação não está registrado no repositório, por isso não é listado aqui.
+Um usuário pode administrar várias empresas, com dados separados por organização. O papel operacional atual é **`OWNER`**; profissionais e clientes são cadastros do negócio e não possuem acesso próprio ao sistema. A interface é em português brasileiro.
 
 ## Funcionalidades
 
-| Área                      | O que existe                                                                                                                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Contas e autenticação** | Cadastro, login e logout; sessão por cookie `HttpOnly`; "sair de todos os dispositivos"; limite de tentativas por IP e por e-mail.                                                            |
-| **Verificação e senha**   | Verificação de e-mail (exigida para criar empresa), reenvio, recuperação e redefinição de senha com token de uso único.                                                                       |
-| **Organizações**          | Criar empresa (nome, slug, fuso horário IANA), listar as empresas do usuário, trocar a empresa ativa, editar configurações. O fuso horário é definido na criação.                             |
-| **Clientes**              | Listagem e edição. Clientes são identificados pelo telefone (E.164) dentro da empresa e criados/reaproveitados ao agendar.                                                                    |
-| **Profissionais**         | Cadastro, edição e vínculo com os serviços que cada um atende.                                                                                                                                |
-| **Serviços**              | Cadastro com duração, buffer pós-atendimento e preço opcional; ativação/desativação.                                                                                                          |
-| **Disponibilidade**       | Horários de trabalho semanais e folgas por profissional; consulta de horários livres em grade de 15 minutos.                                                                                  |
-| **Agendamentos**          | Criar, listar por período, remarcar, confirmar, concluir, marcar falta, cancelar e reativar. Status: `SCHEDULED`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, `NO_SHOW`.                           |
-| **WhatsApp (manual)**     | A agenda gera a mensagem de confirmação e abre o WhatsApp com o texto preenchido; o envio é feito pelo próprio usuário. **Não há integração com a API oficial do WhatsApp.**                  |
-| **E-mails**               | Fila persistente no banco (outbox) com payload cifrado, retentativas com backoff e envio via [Resend](https://resend.com). Em desenvolvimento, sem provedor, o e-mail é impresso no terminal. |
-| **Tema e interface**      | Tema claro, escuro ou do sistema (preferência salva no navegador), landing page responsiva e painel autenticado.                                                                              |
+### Contas e organizações
+
+- Cadastro, login, logout e encerramento de sessões em todos os dispositivos.
+- Verificação de e-mail, reenvio da confirmação e recuperação de senha com links de uso único. Criar uma empresa exige e-mail verificado por padrão.
+- Criação e seleção de empresas, com nome, slug e fuso horário IANA definido na criação.
+- Tratamento de sessão expirada e de troca da empresa ativa em outra aba.
+
+A API também permite atualizar dados da organização; o painel atual oferece criação e seleção. O fuso horário da empresa permanece imutável.
+
+### Serviços, profissionais e clientes
+
+| Área          | Recursos implementados                                                                                                                              |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Serviços      | Cadastro, edição, ativação e desativação; duração em minutos, intervalo após o atendimento (_buffer_) e preço opcional em centavos.                 |
+| Profissionais | Cadastro, edição, ativação e desativação; associação aos serviços atendidos; expediente e folgas na tela de detalhes.                               |
+| Clientes      | Criação ou reaproveitamento pelo telefone ao agendar. A API permite consultar e editar um cliente por ID, incluindo dados de contato e observações. |
+
+O telefone é normalizado para E.164 e único por empresa. Reutilizar um telefone existente ao agendar preserva o cadastro já salvo. **Não há tela independente de clientes nem endpoint de listagem de clientes nesta versão.**
+
+### Agenda e disponibilidade
+
+- Visualização diária e semanal, agrupada por profissional, com navegação por data.
+- Criação, remarcação e cancelamento pelo painel; cancelamentos preservam o registro.
+- Horários disponíveis em grade de 15 minutos, considerando serviço, vínculo com o profissional, expediente, folgas e reservas ativas.
+- Revalidação no servidor e mensagens de conflito quando o horário ou o agendamento mudou durante a operação.
+- Nome, duração, buffer e preço do serviço preservados no agendamento por meio de snapshots.
+
+A API também oferece confirmação, conclusão, registro de falta e reativação de cancelados. Essas ações ainda não têm controles no painel.
+
+| Status      | Significado    | Bloqueia horário |
+| ----------- | -------------- | ---------------- |
+| `SCHEDULED` | Agendado       | Sim              |
+| `CONFIRMED` | Confirmado     | Sim              |
+| `COMPLETED` | Concluído      | Não              |
+| `CANCELLED` | Cancelado      | Não              |
+| `NO_SHOW`   | Não compareceu | Não              |
+
+Concluir e registrar falta só são permitidos após o fim do atendimento. Reativar um cancelado exige nova validação de disponibilidade; concluídos e faltas são estados terminais.
+
+### WhatsApp, e-mails e interface
+
+**WhatsApp manual.** Para agendamentos ativos e futuros, o painel prepara uma mensagem com os dados do atendimento e permite abrir o WhatsApp com o texto preenchido. O usuário revisa e envia. Abrir a mensagem no WhatsApp não altera o status da reserva; não há envio automático nem integração com a API oficial.
+
+**E-mails de conta.** Verificação, recuperação de senha, aviso de senha alterada e aviso de conta já existente usam uma outbox persistente, com envio pelo Resend. Fora de produção, sem provedor configurado, os e-mails são exibidos no terminal do backend.
+
+**Apresentação.** Landing page responsiva, painel autenticado e temas claro, escuro e do sistema. A preferência de tema é persistida no navegador; dados de sessão e dados pessoais não são guardados em `localStorage` ou `sessionStorage` pela aplicação. A página inicial do painel reúne informações da empresa e atalhos, sem indicadores analíticos.
 
 ## Demonstração visual
 
-<!--
-  Ainda não há capturas de tela versionadas no repositório. Para adicioná-las, salve as imagens (dados fictícios) em
-  docs/screenshots/ e referencie-as aqui, por exemplo:
+As capturas reais ainda não estão versionadas. Esta seção está reservada para uma galeria com dados fictícios:
 
-  | Landing page | Agenda |
-  | :---: | :---: |
-  | ![Landing page](docs/screenshots/landing.png) | ![Agenda](docs/screenshots/agenda.png) |
--->
+| Tela                     | O que demonstrar                                              |
+| ------------------------ | ------------------------------------------------------------- |
+| Landing page             | Apresentação do produto e navegação responsiva                |
+| Agenda                   | Visões diária e semanal, horários e formulário de agendamento |
+| Serviços e profissionais | Catálogo, vínculos, expediente e folgas                       |
+| Temas                    | A mesma tela nos modos claro e escuro                         |
 
-_Capturas de tela serão adicionadas em `docs/screenshots/` (landing page, agenda, clientes, serviços e profissionais, tema
-claro e escuro)._
+<!-- Adicionar capturas reais em docs/screenshots/ e substituir esta tabela por imagens com texto alternativo. Incluir apenas arquivos existentes; não usar dados de usuários reais, tokens ou credenciais. -->
 
 ## Stack tecnológica
 
-Versões conforme os `package.json` (dependências fixadas sem `^`).
+Versões declaradas nos `package.json` e no Docker Compose; as dependências estão fixadas sem intervalos de versão.
 
-| Camada                     | Tecnologias                                                                                                                 |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Frontend**               | React 19.3, React Router 8.5, TypeScript 6.0, Vite 8.3, Zod 4.6                                                             |
-| **Backend**                | Node.js 24 (execução direta de TypeScript, sem etapa de build), Fastify 5.12, Zod 4.6, date-fns 4.4 + date-fns-tz 3.2, uuid |
-| **Banco de dados**         | PostgreSQL (18.6 no `docker-compose.yml`), Prisma 7.10 com `@prisma/adapter-pg`, SQL manual nas migrations (constraints)    |
-| **Autenticação/segurança** | Sessões em banco com cookie `HttpOnly`, Argon2id (`crypto.argon2` nativo do Node), `@fastify/cookie`, `@fastify/rate-limit` |
-| **Testes e qualidade**     | Vitest 5, Testing Library, MSW 3 e jsdom (frontend), ESLint 10, typescript-eslint, Prettier 3.9                             |
-| **Infraestrutura**         | Vercel (frontend + rewrite da API), Render (API), PostgreSQL gerenciado, Resend (e-mail), Docker Compose (PostgreSQL local) |
+| Camada                       | Tecnologias                                                                                                                |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Frontend                     | React / React DOM **19.3.1**, React Router **8.5.0**, Vite **8.3.4**, TypeScript **6.0.3**, CSS e Zod **4.6.7**            |
+| Backend                      | Node.js **24**, Fastify **5.12.7**, Zod **4.6.7**, date-fns **4.4.0**, date-fns-tz **3.2.0**, uuid **14.0.3**              |
+| Banco e acesso a dados       | PostgreSQL **18.6** no ambiente local; Prisma / adapter-pg **7.10.1**, pg **8.23.1**                                       |
+| Autenticação e segurança     | Sessões persistidas, Argon2id nativo do Node.js, @fastify/cookie **11.1.3**, @fastify/rate-limit **11.2.1**, proteção CSRF |
+| Testes                       | Vitest **5.0.5**, Testing Library React **16.3.3**, user-event **14.6.8**, MSW **3.0.3**, jsdom **30.1.3**                 |
+| Qualidade                    | ESLint **10.13.0**, typescript-eslint **8.71.2**, Prettier **3.9.10**, verificação estática com TypeScript                 |
+| Infraestrutura e integrações | Configuração de frontend na Vercel, destino da API no Render, Docker Compose local e Resend por HTTP                       |
+
+O backend executa TypeScript diretamente com Node.js 24, sem script de build. O frontend gera os arquivos estáticos com Vite.
 
 ## Arquitetura
 
-Monólito modular em um monorepo npm (workspaces `frontend` e `backend`). A SPA fala apenas com a API REST sob `/api`; em
-produção a Vercel reescreve `/api/*` para o backend, de modo que o navegador enxerga uma única origem.
+O repositório utiliza **npm workspaces**, com uma SPA React e uma API Fastify organizada por módulos. O banco PostgreSQL é compartilhado entre organizações, com escopo de acesso por empresa e integridade referencial reforçada nas migrations.
 
 ```mermaid
 flowchart LR
-    U[Navegador<br/>React SPA] -->|/api/*| V[Vercel<br/>rewrite]
-    V --> API
-    subgraph API[Backend Fastify]
-        direction TB
-        P[Plugins<br/>CSRF · tenant · erros · rate limit]
-        M[Módulos<br/>auth · organizations · services · professionals<br/>availability · customers · appointments]
-        J[Jobs no mesmo processo<br/>outbox de e-mail · manutenção]
-        P --> M
+    UI["Navegador · React SPA"] -->|"/api/* · cookie de sessão"| Proxy["Proxy de mesma origem"]
+    Proxy --> API["API Fastify"]
+    subgraph Backend["Processo Node.js"]
+        API --> Guards["Sessão · CSRF · tenant · permissões"]
+        Guards --> Modules["Módulos e regras de negócio"]
+        Jobs["Jobs · outbox e manutenção"]
     end
-    M --> DB[(PostgreSQL<br/>Prisma)]
-    J --> DB
-    J -->|API HTTP| R[Resend]
-    U -.->|abre wa.me com a mensagem| W[WhatsApp<br/>envio manual]
+    Modules --> Prisma["Prisma + adapter pg"]
+    Prisma --> DB[(PostgreSQL)]
+    Jobs --> DB
+    Jobs -->|"HTTP"| Resend["Resend"]
+    UI -.->|"Link com mensagem · envio manual"| WhatsApp["WhatsApp"]
 ```
 
-**Organização do backend** (`backend/src`): cada módulo em `modules/<nome>` segue `routes.ts` (HTTP e validação Zod) →
-`service.ts` (regras de negócio) → acesso a dados em `lib/db`. `plugins/` contém CSRF, resolução de tenant, tratamento de
-erros e registro de rotas; `jobs/` contém o worker da outbox e a manutenção; `lib/` reúne tempo, e-mail, criptografia e banco.
+O proxy é fornecido pelo Vite em desenvolvimento e pelos rewrites da Vercel na configuração de produção. O cliente HTTP usa `/api` na origem da própria página e envia cookies com `credentials: same-origin`.
 
-**Organização do frontend** (`frontend/src`): `features/` por domínio (agenda, auth, availability, landing, organizations,
-professionals, services), `components/` compartilhados, `api/` com cliente e tipos do contrato, `hooks/` e `lib/` utilitários.
+### Organização do código
 
-**Persistência.** Prisma 7 com adapter `pg`. Colunas de tempo são `timestamptz` (UTC); cada empresa tem um fuso IANA usado
-para converter horários locais. IDs são UUID gerados pela aplicação.
+No **frontend**, `features/` reúne telas e lógica por domínio; `components/` contém layouts e controles compartilhados. Contextos mantêm autenticação e empresa ativa. O cliente em `api/` centraliza chamadas HTTP, erros de sessão e inconsistências de organização entre abas. Guards controlam o acesso às rotas, enquanto a autorização efetiva permanece na API.
 
-**Autenticação.** Sessão no servidor, não JWT: o cookie guarda um token aleatório e somente o hash vai para a tabela
-`sessions`. Em produção o cookie usa `Secure` e o prefixo `__Host-`.
+No **backend**, os módulos separam rotas, schemas Zod e regras de negócio. `plugins/` concentra proteções transversais; `lib/db/` fornece acesso ao banco, escopo por tenant e locks; `jobs/` executa envio de e-mail e manutenção no mesmo processo da API. Relógio e provedor de e-mail podem ser substituídos nos testes.
 
-**Isolamento de dados.** O servidor determina a empresa ativa a partir da sessão e da membership; o cliente nunca envia um
-`organizationId` para obter acesso. As tabelas filhas têm chave estrangeira composta com `organization_id`.
+### Persistência e isolamento
 
-**Integrações externas.** Resend (e-mail) por trás de uma interface `EmailSender`, e WhatsApp via link com texto preenchido.
+O [schema Prisma](backend/prisma/schema.prisma) modela identidade, memberships, sessões, tokens, organizações, serviços, profissionais, disponibilidade, clientes, agendamentos, idempotência e outbox. Os IDs usam UUID v7; instantes são persistidos em `timestamptz`, e a conversão para horário local usa o fuso IANA da empresa.
+
+A organização ativa é resolvida pela sessão e validada contra a membership do usuário. O cabeçalho `X-Active-Org` contém apenas uma asserção do slug exibido na interface: divergência retorna `409 ACTIVE_ORG_CHANGED`, sem conceder acesso a outra organização. Recursos de outro tenant retornam `404`.
+
+As relações entre entidades do negócio usam chaves estrangeiras compostas com `organization_id`. O Prisma organiza o acesso a dados; SQL manual nas [migrations](backend/prisma/migrations) acrescenta `CHECK`, constraints de exclusão e a extensão `btree_gist`, que não são integralmente representados pelo schema Prisma.
+
+### API implementada
+
+Resumo das rotas; os corpos, filtros e validações estão nos arquivos `routes.ts` e `schemas.ts` de cada [módulo](backend/src/modules).
+
+| Área            | Métodos e caminhos                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Saúde           | `GET /api/health`, `GET /api/ready` (inclui verificação de banco)                                                                                            |
+| Conta           | `POST /api/auth/register`, `/login`, `/logout`, `/logout-all`, `/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password`; `GET /api/me` |
+| Organizações    | `GET/POST /api/organizations`; `POST /api/session/active-organization`; `GET/PATCH /api/organization`                                                        |
+| Serviços        | `GET/POST /api/services`; `GET/PATCH /api/services/:id`                                                                                                      |
+| Profissionais   | `GET/POST /api/professionals`; `GET/PATCH /api/professionals/:id`; `PUT /api/professionals/:id/services`                                                     |
+| Expediente      | `GET/POST /api/working-hours`; `PATCH/DELETE /api/working-hours/:id`                                                                                         |
+| Folgas          | `GET/POST /api/time-off`; `PATCH/DELETE /api/time-off/:id`                                                                                                   |
+| Horários livres | `GET /api/availability/slots`                                                                                                                                |
+| Clientes        | `GET/PATCH /api/customers/:id`                                                                                                                               |
+| Agendamentos    | `GET/POST /api/appointments`; `GET /api/appointments/:id`; `POST /api/appointments/:id/{reschedule,reactivate,cancel,confirm,complete,no-show}`              |
+
+Na linha de conta, os sufixos compartilham o prefixo `/api/auth`; as chaves na linha de agendamentos representam ações alternativas. Rotas de negócio exigem sessão, empresa ativa e permissão. Métodos que alteram estado exigem `Origin` permitido e `Content-Type: application/json`, inclusive quando o corpo é `{}`. Criar um agendamento exige `Idempotency-Key`; suas alterações exigem a versão atual do registro.
 
 ## Desafios técnicos e decisões de engenharia
 
-### Conflito de horários garantido pelo banco
+### 1. Impedir sobreposição mesmo com pedidos simultâneos
 
-- **Problema:** dois pedidos simultâneos para o mesmo profissional e horário podem passar por uma checagem feita só na aplicação.
-- **Solução:** a tabela `appointments` tem uma _exclusion constraint_ GiST sobre `(organization_id, professional_id, tstzrange(starts_at, blocked_until, '[)'))`, restrita aos status ativos (`SCHEDULED`, `CONFIRMED`). O intervalo inclui o buffer do serviço e `[)` permite atendimentos que apenas se encostam. Há ainda `CHECK`s que obrigam `ends_at` e `blocked_until` a serem coerentes com os _snapshots_ de duração e buffer.
-- **Benefício:** mesmo que a aplicação falhe em verificar, o banco rejeita a sobreposição (`23P01`). Existem testes de concorrência e de estresse em `backend/test/appointments/`.
+Consultar horários livres antes de inserir não basta: duas requisições podem observar a mesma disponibilidade. A migration de agendamentos define uma **exclusion constraint GiST** por empresa e profissional, sobre o intervalo `[starts_at, blocked_until)`, para `SCHEDULED` e `CONFIRMED`.
 
-### Locks explícitos com ordem global
+O banco rejeita a sobreposição mesmo sob concorrência. O intervalo inclui o buffer; a fronteira aberta permite que o próximo atendimento comece exatamente quando o bloqueio anterior termina. Constraints `CHECK` verificam a coerência entre início, fim, buffer e snapshots. A aplicação traduz o conflito para uma resposta de negócio.
 
-- **Problema:** regras que o banco não expressa (agendamento × folga/horário de trabalho, clientes e profissionais compartilhados entre pedidos) exigem bloqueios, e bloqueios em ordem arbitrária causam _deadlocks_.
-- **Solução:** `backend/src/lib/db/locks/` centraliza `SELECT … FOR NO KEY UPDATE` em uma hierarquia fixa (cliente → profissionais ordenados por id → idempotência → escritas; e, na autenticação, usuário → tokens → sessões → outbox). Um _guard_ rejeita aquisições fora de ordem antes de enviar a consulta, e as transações têm _lock timeout_.
-- **Benefício:** a ordem é verificada por código e por testes (`backend/test/locks/`), e não depende de disciplina de quem escreve a próxima rota.
+### 2. Coordenar reservas, expediente e folgas
 
-### Idempotência na criação de agendamentos
+Uma reserva precisa permanecer válida enquanto outra requisição altera a disponibilidade. As operações compartilham locks do profissional e seguem uma ordem centralizada em [lib/db/locks](backend/src/lib/db/locks): cliente, profissionais em ordem determinística, idempotência e escrita, conforme os recursos usados pela operação.
 
-- **Problema:** repetir a requisição (clique duplo, falha de rede) não deve gerar dois agendamentos.
-- **Solução:** a criação exige o cabeçalho `Idempotency-Key` (UUID). O resultado é persistido por empresa e escopo; repetir o mesmo pedido devolve a mesma resposta com `Idempotent-Replay: true`, e reutilizar a chave com um pedido diferente retorna `409`. Registros expirados são removidos pela rotina de manutenção.
+Um guard verifica a ordem das aquisições. Há timeout de lock de 2 segundos e limite de 8 segundos para a transação interativa. Timeouts e deadlocks tratados resultam em rollback e `503 TEMPORARILY_BUSY`, com `Retry-After`. A estratégia reduz disputas e permite testar a disciplina de bloqueios, sem pressupor ausência absoluta de deadlocks.
 
-### Disponibilidade e fuso horário
+### 3. Separar repetição de pedido de edição concorrente
 
-- **Solução:** `availability/slots.ts` gera inícios em grade de 15 minutos no horário local da empresa, descontando agendamentos ativos e folgas, e exigindo que o atendimento caiba no expediente (o buffer pode ultrapassar o expediente). Alterações de horário ou folga que conflitem com agendamentos futuros ativos são recusadas, com a lista dos conflitos; nada é cancelado automaticamente. A conversão de fuso fica restrita ao módulo `lib/time`, com `Clock` injetável para testar regras de data.
+A criação usa uma chave UUID de idempotência, com resultado persistido por organização e escopo por 24 horas. Repetir a chave com o mesmo conteúdo devolve a resposta registrada e `Idempotent-Replay: true`; reutilizá-la com outro conteúdo retorna `409`.
 
-### Isolamento entre empresas
+Edições usam o campo `version`: um cliente desatualizado recebe `409 STALE_VERSION`. No painel, remarcação e cancelamento recarregam os dados em vez de repetir silenciosamente uma edição sobre uma versão mais recente.
 
-- **Solução:** chaves estrangeiras compostas `(organization_id, id)`, plugin de tenant que resolve a empresa pela sessão, matriz de permissões `can(role, action)` que nega por padrão e retorna `404` para recursos de outra empresa (inexistente e alheio são indistinguíveis). Testes de isolamento em `backend/test/org/` e regras estáticas que vigiam o uso do cliente de banco.
+### 4. Modelar tempo e preservar o histórico do serviço
 
-### Autenticação e sessões
+A grade de início é de 15 minutos, mas a duração do serviço é independente dela. O atendimento deve caber no expediente e não atravessar uma folga; o buffer pode ultrapassar o expediente ou alcançar uma folga, mas continua bloqueando a próxima reserva.
 
-- **Solução:** senhas com Argon2id e verificação contra lista de senhas comuns; token de sessão aleatório com apenas o hash persistido; coluna `credentials_version` comparada a cada requisição, de modo que trocar a senha invalida sessões existentes inclusive diante de logins concorrentes; recuperação de senha com token de uso único consumido de forma atômica; resposta idêntica para e-mail existente e inexistente; CSRF por `SameSite=Lax`, verificação de `Origin` e exigência de `Content-Type: application/json`; rate limit por IP e por e-mail. `TRUST_PROXY` recusa `true` para impedir IP forjado via `X-Forwarded-For`.
+Mudanças de expediente ou folgas incompatíveis com agendamentos futuros ativos são recusadas com os conflitos encontrados. A conversão de fuso fica concentrada nos utilitários de tempo, e o relógio injetável torna testes de datas determinísticos. Snapshots evitam que uma alteração posterior no catálogo modifique duração, preço ou nome de um atendimento já registrado.
 
-### E-mail com outbox transacional
+### 5. Manter autenticação e autorização no servidor
 
-- **Solução:** a mensagem é gravada na tabela `email_outbox` na mesma transação que cria o token, com o payload cifrado (AES-256, chaves com identificador para rotação). Um worker faz _claim_ com _lease_, tenta de novo com backoff exponencial e jitter e marca como morta após o limite de tentativas. A entrega é _at-least-once_: um e-mail duplicado é possível em certas falhas, e isso está documentado.
+As senhas usam Argon2id e validação contra senhas comuns. O cookie contém um token aleatório; apenas seu hash SHA-256 é persistido. As sessões expiram por 7 dias de inatividade ou pelo teto absoluto de 30 dias, com `HttpOnly`, `SameSite=Lax` e, em produção, `Secure` e prefixo `__Host-`.
 
-### Confirmação manual pelo WhatsApp
+A comparação de `credentials_version` a cada autenticação invalida sessões anteriores após redefinição de senha, inclusive em cenários de login concorrente. Tokens de verificação e recuperação têm validade de uma hora e consumo único. A recuperação mantém a mesma resposta para e-mails existentes e inexistentes.
 
-- **Solução:** `frontend/src/lib/whatsapp.ts` apenas monta o texto (cliente, serviço, data e hora no fuso da empresa) para agendamentos ativos e futuros; não envia, não persiste e não altera o status. O usuário revisa e envia pelo próprio WhatsApp, o que evita depender da API oficial e de aprovação de templates.
+A autorização nega ações desconhecidas por padrão. CSRF combina cookie, validação de origem e exigência de JSON; limites de tentativas protegem fluxos de autenticação. `TRUST_PROXY` exige configuração explícita em produção e recusa `true`, evitando confiança irrestrita em cabeçalhos encaminhados.
 
-### Tratamento de erros e configuração segura
+### 6. Persistir a intenção de enviar e-mail
 
-- Erros da API têm `code` estável e `message` em português. A API **não sobe** com configuração ausente ou inválida (`NODE_ENV` é obrigatório e sem padrão; produção exige `ALLOWED_ORIGINS`, chaves da outbox, `TRUST_PROXY` e provedor de e-mail). O frontend não guarda token nem dado pessoal no navegador; a única exceção é a preferência de tema, com teste que vigia isso.
+Token e mensagem são gravados na mesma transação. O payload da outbox usa **AES-256-GCM**, com identificação de chave para rotação. Um worker adquire mensagens com lease, envia e aplica retentativas com backoff e jitter; falhas definitivas, expiração ou esgotamento das tentativas encerram o processamento.
+
+A entrega é _at-least-once_: duplicatas ainda são possíveis. O adaptador envia o ID da mensagem como chave de idempotência ao Resend, mas o efeito real dessa proteção permanece pendente de validação conforme o [guia de e-mail](docs/EMAIL-VERIFICATION.md). O worker e a manutenção rodam junto da API, sem broker externo.
+
+### 7. Tornar falhas compreensíveis e verificáveis
+
+A API padroniza erros com `code`, `message`, `requestId` e detalhes opcionais. O frontend distingue erros de campo, sessão, conflito e rede; os logs aplicam sanitização de informações sensíveis. Configurações inválidas impedem a inicialização, com mensagens que identificam nomes de variáveis sem revelar seus valores.
+
+Testes exercitam essas fronteiras: concorrência e constraints em PostgreSQL real, isolamento entre empresas, sessões e tokens, falhas na outbox e fluxos da interface com respostas HTTP simuladas.
 
 ## Estrutura do projeto
 
 ```text
 agendly/
 ├── backend/
-│   ├── prisma/            # schema.prisma e migrations (inclui SQL manual de constraints)
-│   ├── spikes/            # schema e migrations dos experimentos técnicos usados nas validações
+│   ├── prisma/                 # Schema e migrations, incluindo SQL manual
+│   ├── spikes/                 # Experimentos técnicos e schema de validação
 │   ├── src/
-│   │   ├── config/        # leitura e validação de variáveis de ambiente
-│   │   ├── jobs/          # worker da outbox de e-mail e rotina de manutenção
-│   │   ├── lib/           # db (client, tenant, locks), e-mail, tempo, criptografia, logger
-│   │   ├── modules/       # auth, organizations, services, professionals, availability,
-│   │   │                  # customers, appointments, email, health
-│   │   └── plugins/       # CSRF, tenant, tratamento de erros, registro de rotas
-│   └── test/              # testes de integração contra PostgreSQL real
+│   │   ├── config/             # Validação de ambiente
+│   │   ├── jobs/               # Outbox e manutenção
+│   │   ├── lib/                # Banco, locks, tempo, criptografia e logs
+│   │   ├── modules/            # Auth, organizações, catálogo, agenda e e-mail
+│   │   ├── plugins/            # CSRF, tenant, registro de rotas e erros
+│   │   ├── app.ts              # Composição da API
+│   │   └── server.ts           # Entrada do processo
+│   ├── test/                   # Testes unitários, integração e concorrência
+│   └── tools/                  # Configuração de banco para CLI e testes
 ├── frontend/
+│   ├── public/                 # Inicialização de tema
 │   ├── src/
-│   │   ├── api/           # cliente HTTP e tipos do contrato
-│   │   ├── components/    # layout, UI e guards de rota
-│   │   ├── features/      # agenda, auth, availability, landing, organizations,
-│   │   │                  # professionals, services
-│   │   ├── lib/           # tema, tempo, telefone, WhatsApp, valores monetários
-│   │   ├── routes/        # rotas da SPA
-│   │   └── test/          # testes de componentes e de fluxo (MSW)
-│   └── vercel.json        # rewrite de /api para a API e fallback da SPA
-├── docs/                  # arquitetura, configuração, e-mail e validações por etapa
-├── docker-compose.yml     # PostgreSQL local
-└── .env.example           # nomes e valores de exemplo das variáveis
+│   │   ├── api/                # Cliente HTTP, contexto e tipos
+│   │   ├── components/         # Layouts, controles e guards
+│   │   ├── features/           # Telas organizadas por domínio
+│   │   ├── hooks/              # Recursos e ações assíncronas
+│   │   ├── lib/                # Datas, valores, telefone, tema e WhatsApp
+│   │   ├── routes/             # Rotas da SPA
+│   │   └── test/               # Componentes e fluxos com MSW
+│   ├── vercel.json             # Rewrites de API e fallback da SPA
+│   └── vite.config.ts          # Desenvolvimento, proxy e testes
+├── docs/                       # Arquitetura, configuração e validações
+├── .env.example                # Modelo de configuração local
+├── docker-compose.yml          # PostgreSQL local
+└── package.json                # Workspaces e comandos de qualidade
 ```
 
 ## Instalação e execução local
 
-**Pré-requisitos:** Node.js 24 (`.nvmrc`; o `package.json` exige `>=24.0.0 <25`), npm e Docker (ou outro PostgreSQL acessível).
+### Pré-requisitos
+
+- Node.js **24.7 ou superior dentro da linha 24** e npm, devido ao uso de `crypto.argon2`. A versão principal está em `.nvmrc`; o intervalo declarado em `engines` é `>=24.0.0 <25`.
+- Docker com Compose, ou PostgreSQL acessível. O Compose utiliza PostgreSQL **18.6**.
+- Permissão para aplicar migrations e instalar a extensão `btree_gist` no banco local.
+
+Na raiz do repositório:
 
 ```bash
-# 1. Dependências (raiz do monorepo)
-npm install
+npm ci
+cp .env.example .env
+```
 
-# 2. Variáveis de ambiente
-cp .env.example .env   # ajuste POSTGRES_* e DATABASE_URL; a senha de exemplo é apenas ilustrativa
+Se já existir `.env`, preserve-o e ajuste somente o necessário. Configure `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` e `POSTGRES_PORT`; faça `DATABASE_URL` corresponder a esses valores. Use credenciais próprias de desenvolvimento, sem versioná-las.
 
-# 3. PostgreSQL local
-docker compose up -d
+O exemplo define porta **5432**; sem `POSTGRES_PORT`, o Compose publica **5433**. A porta da URL deve coincidir com a porta publicada.
 
-# 4. Prisma: gerar o client e aplicar as migrations
+```bash
+# Subir o PostgreSQL local e verificar seu estado
+docker compose up -d postgres
+docker compose ps
+
+# Gerar o cliente Prisma e aplicar as migrations existentes
 npm run db:generate -w backend
-npm run db:migrate -w backend     # desenvolvimento (prisma migrate dev)
+npm run db:deploy -w backend
 
-# 5. Backend (http://127.0.0.1:3000)
+# Iniciar a API
 npm run dev -w backend
+```
 
-# 6. Frontend, em outro terminal (http://localhost:5173, com proxy de /api)
+Em outro terminal, na raiz:
+
+```bash
 npm run dev -w frontend
 ```
 
-Em desenvolvimento, sem `RESEND_API_KEY`, os e-mails de verificação e recuperação (com o link) são impressos no terminal do
-backend. Em ambientes de produção use `npm run db:deploy -w backend` para aplicar as migrations.
+Acesse **http://localhost:5173**. O backend escuta em `http://127.0.0.1:3000`, e o Vite encaminha `/api` para ele. O comando `dev` do backend inicia o processo sem modo watch; alterações no servidor exigem reinício.
 
-### Variáveis de ambiente
+### Primeiro uso
 
-Fonte: `backend/src/config/env.ts`, [`.env.example`](.env.example) e [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md). A API
-recusa configurações inválidas e lista apenas os **nomes** das variáveis problemáticas.
+1. Cadastre uma conta e abra o link de verificação exibido no terminal do backend, quando estiver usando o envio para console.
+2. Crie a empresa e escolha seu fuso horário.
+3. Cadastre serviços, profissionais e os vínculos entre eles.
+4. Configure o expediente do profissional; adicione folgas quando necessário.
+5. Abra a agenda e crie um atendimento com dados fictícios para experimentar o fluxo.
 
-| Variável                              | Obrigatória?                 | Descrição                                                                               |
-| ------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                        | Sim                          | String de conexão PostgreSQL, ex.: `postgresql://USUARIO:SENHA@HOST:5432/BANCO`         |
-| `NODE_ENV`                            | Sim (sem padrão)             | `development`, `test` ou `production`                                                   |
-| `POSTGRES_USER` / `_PASSWORD` / `_DB` | Só para o Docker Compose     | Credenciais do PostgreSQL local                                                         |
-| `POSTGRES_PORT`                       | Não                          | Porta publicada pelo Compose (padrão 5433 se omitida)                                   |
-| `HOST`, `PORT`, `LOG_LEVEL`           | Não                          | Endereço, porta e nível de log da API                                                   |
-| `ALLOWED_ORIGINS`                     | Produção                     | Origens permitidas em métodos que alteram estado (CSRF); em produção exige HTTPS        |
-| `TRUST_PROXY`                         | Produção                     | `false`, número de proxies confiáveis ou lista de IPs/CIDRs; `true` é recusado          |
-| `APP_BASE_URL`                        | Não                          | URL pública da SPA, usada nos links dos e-mails (padrão: primeira de `ALLOWED_ORIGINS`) |
-| `OUTBOX_ENCRYPTION_KEYS`              | Produção                     | Chaves AES-256 da outbox no formato `id:base64`                                         |
-| `OUTBOX_CURRENT_KEY_ID`               | Produção                     | Identificador da chave em uso                                                           |
-| `REQUIRE_EMAIL_VERIFICATION`          | Não                          | Exigida por padrão; `false` só é aceito fora de produção                                |
-| `RESEND_API_KEY` e `EMAIL_FROM`       | Produção (juntas ou nenhuma) | Provedor de e-mail. Sem elas, fora de produção, o e-mail vai para o console             |
+Sem expediente ou vínculo entre profissional e serviço, não haverá horários elegíveis. Não é necessário um seed para iniciar esse fluxo.
 
-Nunca versione o `.env` (já ignorado pelo `.gitignore`) nem coloque segredos reais em arquivos do repositório.
+Para desenvolver mudanças no modelo de dados, existe `npm run db:migrate -w backend` (`prisma migrate dev`). Para reproduzir a versão atual, utilize `db:deploy`, que aplica as migrations já versionadas. Preserve as migrations SQL: `db push` não substitui as constraints manuais.
+
+## Variáveis de ambiente
+
+Fontes: [modelo de ambiente](.env.example), [validação do backend](backend/src/config/env.ts) e [guia de configuração](docs/CONFIGURATION.md). O frontend utiliza a origem atual e não exige variável `VITE_*` para a API.
+
+| Variável                                            | Quando é necessária      | Finalidade / padrão                                                                                                     |
+| --------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                      | Sempre para a API        | Conexão PostgreSQL. Formato ilustrativo: `postgresql://USUARIO:SENHA@HOST:PORTA/BANCO`.                                 |
+| `NODE_ENV`                                          | Sempre                   | `development`, `test` ou `production`, sem padrão implícito. O script `dev` define `development`.                       |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Docker Compose local     | Usuário, senha e banco do contêiner.                                                                                    |
+| `POSTGRES_PORT`                                     | Opcional                 | Porta local publicada; padrão do Compose: `5433`.                                                                       |
+| `HOST`, `PORT`                                      | Opcionais                | Interface e porta da API; padrões `127.0.0.1` e `3000`.                                                                 |
+| `LOG_LEVEL`                                         | Opcional                 | Nível de log; padrão `info`.                                                                                            |
+| `ALLOWED_ORIGINS`                                   | Obrigatória em produção  | Origens permitidas para alterações, separadas por vírgula. Padrão local: `http://localhost:5173`; produção exige HTTPS. |
+| `TRUST_PROXY`                                       | Obrigatória em produção  | `false`, número de saltos de 1 a 10 ou lista de IPs/CIDRs. Padrão local: `false`; `true` é recusado.                    |
+| `APP_BASE_URL`                                      | Opcional                 | Origem da SPA para links de e-mail; padrão: primeira origem permitida. HTTPS em produção.                               |
+| `OUTBOX_ENCRYPTION_KEYS`                            | Obrigatória em produção  | Chaves de 32 bytes em Base64, no formato `ID:CHAVE_BASE64`, separadas por vírgula.                                      |
+| `OUTBOX_CURRENT_KEY_ID`                             | Obrigatória em produção  | ID da chave usada para novas mensagens.                                                                                 |
+| `REQUIRE_EMAIL_VERIFICATION`                        | Opcional                 | Padrão `true`. `false` é aceito somente em desenvolvimento/teste.                                                       |
+| `RESEND_API_KEY`, `EMAIL_FROM`                      | Obrigatórias em produção | Chave do provedor e remetente. Fora de produção, configure ambas ou nenhuma; sem ambas, o envio vai para o console.     |
+
+Fora de produção existe uma chave pública de outbox para desenvolvimento/testes. Em produção, forneça chaves próprias pelo ambiente da plataforma e mantenha as antigas enquanto houver mensagens cifradas com elas. Os placeholders acima são descritivos e devem ser substituídos localmente.
+
+`AGENDLY_DB_NAME` é uma variável auxiliar da CLI Prisma, utilizada pelos testes para selecionar o banco; não é necessária para iniciar a aplicação. Não há `JWT_SECRET`: a autenticação usa sessões persistidas.
 
 ## Testes e qualidade
 
-- **Backend:** Vitest com testes de integração contra PostgreSQL real. O _global setup_ cria os bancos `agendly_test` e
-  `agendly_spike`, aplica as migrations e executa os arquivos em série. Áreas cobertas: autenticação, sessões, CSRF, rate
-  limit, isolamento entre empresas, permissões, serviços, profissionais, disponibilidade, agendamentos (concorrência,
-  constraint, idempotência, locks), outbox e Resend.
-- **Frontend:** Vitest com jsdom, Testing Library e MSW (backend simulado) para auth, agenda, WhatsApp, tema, landing,
-  serviços, profissionais e organizações.
-- **Quantidade:** a contagem aproximada de blocos `it`/`test` nos arquivos é de cerca de 650 no backend e 300 no frontend
-  (levantamento estático, sem execução da suíte para este README).
+**Backend.** Vitest combina testes unitários com integração em PostgreSQL real. As suítes cobrem autenticação, autorização, isolamento, migrations, constraints, disponibilidade, concorrência, idempotência, locks e outbox. Arquivos de teste são executados sequencialmente porque compartilham bancos de teste.
+
+**Frontend.** Vitest com jsdom, Testing Library e MSW exercita componentes e fluxos: autenticação, organizações, serviços, profissionais, disponibilidade, agenda, WhatsApp, temas e tratamento de erros. As respostas da API são simuladas; esses testes não constituem uma suíte ponta a ponta em navegador real.
+
+### Preparação do backend
+
+Utilize uma instância PostgreSQL **local e exclusiva para desenvolvimento/testes**. O setup usa a conexão configurada, acessa o banco administrativo `postgres`, cria `agendly_test` e `agendly_spike`, gera clientes Prisma e aplica migrations. Os testes limpam tabelas e alguns criam bancos temporários: o usuário precisa de permissão para criar bancos.
+
+Instale também `psql` e `pg_dump` no `PATH`, com versão compatível com o servidor; há testes de dump/restauração. Não execute a suíte contra uma instância de produção.
 
 ```bash
-npm test                          # todos os workspaces (o backend precisa do PostgreSQL ativo)
-npm test -w backend
+# Suítes
+npm test
 npm test -w frontend
+npm test -w backend
+
+# Qualidade e build
 npm run lint
 npm run typecheck
 npm run format:check
-npm run build -w frontend         # tsc + vite build
-npm run db:drift -w backend       # confere se as migrations refletem o schema.prisma
+npm run build -w frontend
+
+# Comparação do banco configurado com o schema Prisma
+npm run db:drift -w backend
 ```
+
+`typecheck` também gera o cliente Prisma por meio de `pretypecheck` no backend. `db:drift` consulta o banco configurado e não substitui testes das constraints SQL manuais. Os comandos acima correspondem aos scripts versionados; este README não publica contagem de testes ou percentual de cobertura sem uma medição atual.
 
 ## Deploy
 
-Configuração confirmada no repositório:
+| Componente        | Evidência no repositório                       | Configuração relevante                                                                                                                                        |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend / Vercel | [frontend/vercel.json](frontend/vercel.json)   | Rewrite de `/api/:path*` para o backend e fallback das demais rotas para `/index.html`. Build: `npm run build -w frontend`; saída em `frontend/dist`.         |
+| API / Render      | Destino `agendly-0y4y.onrender.com` no rewrite | Inicialização disponível por `npm start -w backend`; configuração do serviço na plataforma não está versionada.                                               |
+| PostgreSQL        | Prisma e migrations                            | Aplicação das migrations por `npm run db:deploy -w backend`. O provedor de produção não está identificado nos arquivos versionados; Neon não está confirmado. |
+| E-mail / Resend   | Adaptador HTTP e guia de e-mail                | Variáveis do provedor, domínio remetente e chaves da outbox configurados no servidor.                                                                         |
 
-- **Frontend na Vercel:** `frontend/vercel.json` reescreve `/api/:path*` para a API hospedada no Render e devolve
-  `/index.html` nas demais rotas (fallback da SPA). Assim o navegador usa uma única origem e o cookie de sessão é de primeira parte.
-- **Backend no Render:** destino do rewrite acima (`agendly-0y4y.onrender.com`). Os scripts do projeto indicam `npm start -w backend`
-  com `NODE_ENV=production`; as variáveis de produção ficam na plataforma, nunca em arquivo versionado. A configuração do
-  serviço no Render não está versionada.
-- **PostgreSQL gerenciado:** migrations aplicadas com `npm run db:deploy -w backend`. O provedor do banco não é identificado
-  em nenhum arquivo do repositório.
-- **E-mail:** Resend. Segundo `docs/EMAIL-VERIFICATION.md`, a entrega real foi validada em desenvolvimento; a validação em
-  produção (domínio próprio com SPF/DKIM/DMARC) constava como pendente na data daquele documento.
+Para preparar o backend, os scripts disponíveis são `npm ci`, `npm run db:generate -w backend`, `npm run db:deploy -w backend` e `npm start -w backend`. Esta sequência descreve as operações necessárias, sem presumir os comandos atualmente salvos no painel de hospedagem.
+
+Em produção, defina `NODE_ENV=production`, as variáveis obrigatórias e `HOST=0.0.0.0` quando o serviço precisar escutar em todas as interfaces; utilize a `PORT` fornecida pela plataforma. Configure `TRUST_PROXY` conforme os saltos efetivos e o acesso de rede. O proxy precisa tratar corretamente `X-Forwarded-For`; não há um número universal de saltos para copiar.
+
+A mesma origem pública permite usar o cookie de sessão sem CORS entre SPA e API. `ALLOWED_ORIGINS` deve corresponder ao frontend HTTPS; `APP_BASE_URL` deve apontar para a origem pública usada nos links de verificação e recuperação.
+
+O [registro de validação de e-mail](docs/EMAIL-VERIFICATION.md) documenta entrega real em desenvolvimento em 20/10/2026, com validação de produção ainda pendente. Na inicialização em produção, a API consulta o Resend: configuração identificada como inválida impede a subida; verificação inconclusiva gera aviso. Isso não comprova entregabilidade em produção.
 
 ## Limitações e próximos passos
 
-**Limitações atuais**
+### Limitações atuais
 
-- O rate limit é em memória: vale por instância e zera ao reiniciar. Com mais de uma instância, o limite efetivo se multiplica.
-- O envio de e-mail e a manutenção rodam no mesmo processo da API.
-- O WhatsApp é manual: não há envio automático, webhooks nem lembretes.
-- O papel `OWNER` é o único; não há convites nem equipe. O fuso horário da empresa e o e-mail da conta não podem ser alterados.
-- A entrega de e-mail em produção depende de configuração e validação do domínio remetente.
+- O painel não oferece gestão independente de clientes, edição de organização ou controles para todas as transições de status disponíveis na API.
+- A página inicial autenticada tem atalhos e informações da empresa, sem dashboard analítico. A listagem da agenda tem limite de 500 registros, sinalizado pela interface quando atingido.
+- Apenas `OWNER` opera o sistema; não há convites nem gestão de equipe. Fuso da organização e e-mail da conta não são editáveis.
+- WhatsApp depende de revisão e envio manual; não há webhooks, lembretes automáticos ou atualização de status a partir de mensagens.
+- Rate limits ficam em memória por instância e são reiniciados com o processo. Jobs de e-mail e manutenção compartilham o processo da API.
+- Reenvios de verificação podem deixar na fila mensagens anteriores com links já invalidados. Duplicatas de e-mail continuam possíveis.
 
-**Planejado, ainda não implementado** (conforme `docs/PROJECT.md`; nada abaixo está disponível)
+### Evoluções previstas ou pendentes
 
-- Página pública de agendamento para clientes finais, com proteção contra abuso.
-- Papel `ADMIN` e gerenciamento de membros.
-- Integração oficial com o WhatsApp, confirmações e lembretes automáticos.
-- Cobrança e assinaturas; observabilidade avançada; 2FA e login social.
+A documentação de projeto prevê página pública de agendamento e evolução de papéis/membros. **Esses fluxos ainda não estão implementados**, mesmo havendo campos de publicação e o valor `PUBLIC` no schema. Consulte o [escopo do projeto](docs/PROJECT.md) e as [decisões de arquitetura](docs/ARCHITECTURE.md) para propostas futuras.
+
+Permanecem pendentes a galeria de screenshots, o registro da URL pública do frontend e a atualização das evidências de entrega de e-mail em produção. Ampliação do painel e de integrações deve ser tratada como evolução, não como capacidade disponível nesta versão.
 
 ## Documentação técnica
 
-| Documento                                                  | Conteúdo                                                             |
-| ---------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)             | Arquitetura, modelo de dados, locks, segurança e decisões de produto |
-| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)           | Variáveis do backend e comportamento por ambiente                    |
-| [`docs/EMAIL-VERIFICATION.md`](docs/EMAIL-VERIFICATION.md) | Verificação de e-mail, outbox e status da entrega                    |
-| [`docs/PROJECT.md`](docs/PROJECT.md)                       | Escopo, MVP e princípios                                             |
-| `docs/STAGE-*-VALIDATIONS.md`                              | Evidências das validações técnicas, etapa a etapa                    |
+| Referência                                          | Conteúdo                                                                |
+| --------------------------------------------------- | ----------------------------------------------------------------------- |
+| [Arquitetura](docs/ARCHITECTURE.md)                 | Modelo de dados, segurança, locks e decisões de produto                 |
+| [Configuração](docs/CONFIGURATION.md)               | Ambiente, origens, proxy e comportamento por ambiente                   |
+| [Verificação de e-mail](docs/EMAIL-VERIFICATION.md) | Fluxos de conta, outbox, provedor e pendências de validação             |
+| [Projeto](docs/PROJECT.md)                          | Escopo e princípios do produto                                          |
+| [Validações por etapa](docs/)                       | Arquivos `STAGE-*-VALIDATIONS.md`, com cenários e resultados históricos |
 
-> Alguns documentos em `docs/` foram escritos durante o desenvolvimento e podem descrever como "proposta" itens que já
-> foram implementados; em caso de divergência, vale o código.
+Os documentos de planejamento e os resultados por etapa registram momentos do desenvolvimento. Propostas futuras e contagens históricas não devem ser interpretadas como funcionalidades ou métricas atuais; para o comportamento implementado, consulte o código e suas migrations.
 
 ## Autor
 
@@ -324,5 +402,4 @@ Configuração confirmada no repositório:
 
 ## Licença
 
-O repositório ainda não possui um arquivo `LICENSE`; portanto, nenhuma licença de uso foi concedida. Todos os direitos
-reservados ao autor até que uma licença seja definida.
+Não há um arquivo `LICENSE` na raiz do repositório. Nenhuma licença foi atribuída ao projeto por este README. Avisos de licença de recursos de terceiros, como a fonte incluída no frontend, permanecem nos respectivos diretórios.
