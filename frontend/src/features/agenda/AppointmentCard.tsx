@@ -21,6 +21,7 @@ import { formatCents } from "../../lib/money";
 import { formatDateTime } from "../../lib/time";
 import { SlotsField } from "./SlotsField";
 import { useSlots } from "./useSlots";
+import { WhatsAppConfirmation } from "./WhatsAppConfirmation";
 
 const REASON_MAX = 200;
 
@@ -47,6 +48,7 @@ export function AppointmentCard({
   shownDate,
   onChanged,
   onStale,
+  confirmationRevision = 0,
 }: {
   appointment: ApiAppointment;
   professionals: ApiProfessional[];
@@ -56,6 +58,7 @@ export function AppointmentCard({
   shownDate: string;
   onChanged: (message: string) => void;
   onStale: () => void;
+  confirmationRevision?: number;
 }) {
   const [mode, setMode] = useState<"reschedule" | "cancel" | null>(null);
   const label = `${a.customer.name}, ${formatDateTime(a.startsAt, timeZone)}`;
@@ -120,6 +123,12 @@ export function AppointmentCard({
               onChanged(m);
             }}
             onStale={staleAndClose}
+          />
+        )}
+        {mode === null && (
+          <WhatsAppConfirmation
+            appointment={a}
+            revision={confirmationRevision}
           />
         )}
         {mode === "cancel" && (

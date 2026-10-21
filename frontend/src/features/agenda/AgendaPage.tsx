@@ -30,7 +30,7 @@ export function AgendaPage() {
   const { active } = useOrganizations();
   // A timezone é SEMPRE a da empresa ativa já validada pelo servidor (imutável, R9), nunca a do navegador.
   if (!active) return <Loading />;
-  return <Agenda timeZone={active.timezone} />;
+  return <Agenda key={active.slug} timeZone={active.timezone} />;
 }
 
 function Agenda({ timeZone }: { timeZone: string }) {
@@ -40,6 +40,7 @@ function Agenda({ timeZone }: { timeZone: string }) {
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [confirmationRevision, setConfirmationRevision] = useState(0);
 
   const refs = useResource(
     async (signal) => {
@@ -81,6 +82,7 @@ function Agenda({ timeZone }: { timeZone: string }) {
       : `${formatLocalDate(days[0] as string)} a ${formatLocalDate(days[6] as string)}`;
 
   function refresh() {
+    setConfirmationRevision((revision) => revision + 1);
     appts.reload();
   }
 
@@ -211,6 +213,7 @@ function Agenda({ timeZone }: { timeZone: string }) {
             professionals={refs.resource.data.professionals}
             services={refs.resource.data.services}
             appointments={appts.resource.data}
+            confirmationRevision={confirmationRevision}
             onChanged={(message) => {
               setWarning(null);
               setNotice(message);
@@ -236,6 +239,7 @@ function AgendaBody({
   professionals,
   services,
   appointments,
+  confirmationRevision,
   onChanged,
   onStale,
 }: {
@@ -245,6 +249,7 @@ function AgendaBody({
   professionals: ApiProfessional[];
   services: ApiService[];
   appointments: ApiAppointment[];
+  confirmationRevision: number;
   onChanged: (message: string) => void;
   onStale: () => void;
 }) {
@@ -278,6 +283,7 @@ function AgendaBody({
         <AppointmentCard
           key={a.id}
           appointment={a}
+          confirmationRevision={confirmationRevision}
           professionals={professionals}
           services={services}
           timeZone={timeZone}

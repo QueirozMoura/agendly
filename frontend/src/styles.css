@@ -945,6 +945,29 @@ a.button {
 .appt .row-actions {
   margin-top: 0.5rem;
 }
+.whatsapp-preview {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.whatsapp-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.whatsapp-action {
+  display: flex;
+}
+.whatsapp-action .button,
+.whatsapp-preview .button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
 .week-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(9rem, 1fr));

@@ -103,6 +103,17 @@ export interface ConflictDetails {
 export type AppointmentStatus =
   "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
 
+/** Contrato existente de GET /api/customers/:id; phone contém E.164. */
+export interface ApiCustomer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Agendamento como a API devolve. `service` são os SNAPSHOTS copiados na criação (R3), nunca os valores atuais. */
 export interface ApiAppointment {
   id: string;
