@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
  * Ícones do painel: SVG inline de traço (herdam `currentColor`), sem biblioteca. Decorativos: sempre `aria-hidden`;
@@ -98,8 +98,9 @@ export const MonitorIcon = () => (
   </Svg>
 );
 
-/** Marca do Agendly: calendário com marca de confirmação, no verde-petróleo do produto. */
+/** Marca do Agendly: calendário com marca de confirmação, no degradê azul-violeta do produto. */
 export function BrandMark() {
+  const gradient = `brand-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <svg
       className="brand-mark"
@@ -109,11 +110,17 @@ export function BrandMark() {
       aria-hidden="true"
       focusable="false"
     >
-      <rect width="28" height="28" rx="8" fill="currentColor" />
+      <defs>
+        <linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style={{ stopColor: "var(--grad-a)" }} />
+          <stop offset="1" style={{ stopColor: "var(--grad-b)" }} />
+        </linearGradient>
+      </defs>
+      <rect width="28" height="28" rx="8" fill={`url(#${gradient})`} />
       <path
         d="M8 11.5h12M10 8v2.5M18 8v2.5M10.5 17l2.5 2.5 4.5-5"
         fill="none"
-        stroke="var(--primary-text)"
+        stroke="var(--on-grad)"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -121,3 +128,30 @@ export function BrandMark() {
     </svg>
   );
 }
+
+export const ClockIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Svg>
+);
+export const ChevronLeftIcon = () => (
+  <Svg>
+    <path d="M15 18l-6-6 6-6" />
+  </Svg>
+);
+export const ChevronRightIcon = () => (
+  <Svg>
+    <path d="M9 18l6-6-6-6" />
+  </Svg>
+);
+export const PlusIcon = () => (
+  <Svg>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+export const RefreshIcon = () => (
+  <Svg>
+    <path d="M20 11a8 8 0 00-14.9-3M4 4v4h4M4 13a8 8 0 0014.9 3M20 20v-4h-4" />
+  </Svg>
+);

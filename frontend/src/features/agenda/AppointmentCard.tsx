@@ -7,6 +7,7 @@ import type {
   ApiService,
   AppointmentStatus,
 } from "../../api/types";
+import { ClockIcon } from "../../components/icons";
 import { Alert, Field } from "../../components/ui";
 import { useAction } from "../../hooks/useAction";
 import {
@@ -74,13 +75,14 @@ export function AppointmentCard({
       <article aria-label={`Agendamento de ${label}`}>
         <div className="appt-head">
           <strong className="appt-time">
+            <ClockIcon />
             {sameDay ? time : formatDateTime(a.startsAt, timeZone)}
           </strong>
           <span className={`badge badge-${a.status.toLowerCase()}`}>
             {STATUS_LABEL[a.status]}
           </span>
         </div>
-        <div>{a.customer.name}</div>
+        <div className="appt-customer">{a.customer.name}</div>
         <div className="muted">
           {a.service.name} · {a.service.durationMinutes} min
           {a.service.bufferMinutes > 0 &&

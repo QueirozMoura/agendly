@@ -96,18 +96,20 @@ export function ServicesPage() {
         <ul className="rows" aria-label="Serviços">
           {services.map((s) => (
             <li key={s.id} className={s.active ? "" : "inactive"}>
-              <div>
-                <strong>{s.name}</strong>{" "}
-                {!s.active && <span className="badge">Inativo</span>}
-                <div className="muted">
-                  {s.durationMinutes} min
-                  {s.bufferMinutes > 0
-                    ? ` + ${s.bufferMinutes} min de intervalo`
-                    : ""}{" "}
-                  ·{" "}
-                  {s.priceCents === null
-                    ? "sem preço"
-                    : formatCents(s.priceCents)}
+              <div className="row-main">
+                <div>
+                  <strong>{s.name}</strong>{" "}
+                  {!s.active && <span className="badge">Inativo</span>}
+                  <div className="muted">
+                    {s.durationMinutes} min
+                    {s.bufferMinutes > 0
+                      ? ` + ${s.bufferMinutes} min de intervalo`
+                      : ""}{" "}
+                    ·{" "}
+                    {s.priceCents === null
+                      ? "sem preço"
+                      : formatCents(s.priceCents)}
+                  </div>
                 </div>
               </div>
               <div className="row-actions">

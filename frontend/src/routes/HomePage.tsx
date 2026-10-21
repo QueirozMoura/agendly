@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ApiError, messageOf } from "../api/client";
 import { useApi } from "../api/ApiContext";
 import type { ApiOrganization } from "../api/types";
+import { Link } from "react-router";
+import { CalendarIcon, PeopleIcon, ServicesIcon } from "../components/icons";
 import { Alert, Loading } from "../components/ui";
 import { useOrganizations } from "../features/organizations/OrganizationContext";
 
@@ -35,7 +37,36 @@ export function HomePage() {
   if (!org) return <Loading />;
   return (
     <section className="page">
-      <h1>{org.name}</h1>
+      <div className="hero-card">
+        <span className="avatar" aria-hidden="true">
+          {org.name.slice(0, 1).toUpperCase()}
+        </span>
+        <h1>{org.name}</h1>
+      </div>
+      <nav className="quick-links" aria-label="Atalhos">
+        <Link className="quick-link" to="/agenda" aria-label="Abrir agenda">
+          <span className="tile">
+            <CalendarIcon />
+          </span>
+          Agenda
+        </Link>
+        <Link className="quick-link" to="/servicos" aria-label="Abrir serviços">
+          <span className="tile">
+            <ServicesIcon />
+          </span>
+          Serviços
+        </Link>
+        <Link
+          className="quick-link"
+          to="/profissionais"
+          aria-label="Abrir profissionais"
+        >
+          <span className="tile">
+            <PeopleIcon />
+          </span>
+          Profissionais
+        </Link>
+      </nav>
       <dl className="summary">
         <dt>Endereço</dt>
         <dd>{org.slug}</dd>

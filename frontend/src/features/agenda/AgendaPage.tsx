@@ -6,6 +6,12 @@ import type {
   ApiProfessional,
   ApiService,
 } from "../../api/types";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  RefreshIcon,
+} from "../../components/icons";
 import { Alert, Field, Loading } from "../../components/ui";
 import { useResource } from "../../hooks/useResource";
 import {
@@ -114,6 +120,7 @@ function Agenda({ timeZone }: { timeZone: string }) {
             className="button"
             onClick={() => setDate(addDays(date, -step))}
           >
+            <ChevronLeftIcon />
             Anterior
           </button>
           <button
@@ -129,6 +136,7 @@ function Agenda({ timeZone }: { timeZone: string }) {
             onClick={() => setDate(addDays(date, step))}
           >
             Próximo
+            <ChevronRightIcon />
           </button>
         </div>
         <Field
@@ -140,20 +148,24 @@ function Agenda({ timeZone }: { timeZone: string }) {
             if (isLocalDate(e.target.value)) setDate(e.target.value);
           }}
         />
-        <button type="button" className="button" onClick={refresh}>
-          Atualizar
-        </button>
-        <button
-          type="button"
-          className="button primary-inline"
-          onClick={() => {
-            setNotice(null);
-            setCreating((v) => !v);
-          }}
-          aria-expanded={creating}
-        >
-          Novo agendamento
-        </button>
+        <div className="toolbar-end">
+          <button type="button" className="button" onClick={refresh}>
+            <RefreshIcon />
+            Atualizar
+          </button>
+          <button
+            type="button"
+            className="button primary-inline"
+            onClick={() => {
+              setNotice(null);
+              setCreating((v) => !v);
+            }}
+            aria-expanded={creating}
+          >
+            <PlusIcon />
+            Novo agendamento
+          </button>
+        </div>
       </div>
       <h2 className="agenda-heading" aria-live="polite">
         {heading}
@@ -313,6 +325,9 @@ function AgendaBody({
             aria-label={`Agenda de ${p.name}`}
           >
             <h3>
+              <span className="avatar sm" aria-hidden="true">
+                {p.name.slice(0, 1).toUpperCase()}
+              </span>
               {p.name}
               {!p.active && <span className="muted"> (inativo)</span>}
             </h3>

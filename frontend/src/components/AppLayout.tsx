@@ -140,23 +140,6 @@ export function AppLayout() {
     <div
       className={`app-shell${collapsed ? " is-collapsed" : ""}${drawerOpen ? " drawer-open" : ""}`}
     >
-      <div className="mobile-bar">
-        <button
-          type="button"
-          ref={menuButton}
-          className="icon-button"
-          aria-label="Abrir menu"
-          aria-expanded={drawerOpen}
-          aria-controls="app-sidebar"
-          onClick={() => setDrawerOpen(true)}
-        >
-          <MenuIcon />
-        </button>
-        <span className="mobile-title" aria-hidden="true">
-          <BrandMark /> Agendly
-        </span>
-      </div>
-
       <aside
         id="app-sidebar"
         ref={sidebar}
@@ -293,6 +276,30 @@ export function AppLayout() {
         onClick={closeDrawer}
       />
 
+      <div className="mobile-bar">
+        <button
+          type="button"
+          ref={menuButton}
+          className="icon-button"
+          aria-label="Abrir menu"
+          aria-expanded={drawerOpen}
+          aria-controls="app-sidebar"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <MenuIcon />
+        </button>
+        <span className="mobile-title" aria-hidden="true">
+          <BrandMark /> Agendly
+        </span>
+        {activeName && (
+          <Link to="/empresas" className="org-pill" title="Trocar de empresa">
+            <span className="avatar" aria-hidden="true">
+              {activeName.slice(0, 1).toUpperCase()}
+            </span>
+            <span>{activeName}</span>
+          </Link>
+        )}
+      </div>
       <main className="app-content">
         {switchError && <Alert kind="error">{switchError}</Alert>}
         {user && !user.emailVerified && (

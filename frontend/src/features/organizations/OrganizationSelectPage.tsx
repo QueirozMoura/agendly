@@ -88,12 +88,17 @@ export function OrganizationSelectPage() {
           <ul className="org-list" aria-label="Empresas">
             {orgs.organizations.map((o) => (
               <li key={o.slug}>
-                <div>
-                  <strong>{o.name}</strong>
-                  <span className="muted"> · {o.slug}</span>
-                  {o.slug === orgs.activeSlug && (
-                    <span className="badge badge-confirmed">Ativa</span>
-                  )}
+                <div className="row-main">
+                  <span className="avatar" aria-hidden="true">
+                    {o.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <strong>{o.name}</strong>
+                    <span className="muted"> · {o.slug}</span>
+                    {o.slug === orgs.activeSlug && (
+                      <span className="badge badge-confirmed">Ativa</span>
+                    )}
+                  </div>
                 </div>
                 <button
                   type="button"

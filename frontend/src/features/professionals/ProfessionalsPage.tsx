@@ -60,13 +60,18 @@ export function ProfessionalsPage() {
         <ul className="rows" aria-label="Profissionais">
           {professionals.map((p) => (
             <li key={p.id} className={p.active ? "" : "inactive"}>
-              <div>
-                <strong>{p.name}</strong>{" "}
-                {!p.active && <span className="badge">Inativo</span>}
-                <div className="muted">
-                  {p.serviceIds.length === 0
-                    ? "Nenhum serviço vinculado"
-                    : `${p.serviceIds.length} ${p.serviceIds.length === 1 ? "serviço" : "serviços"}`}
+              <div className="row-main">
+                <span className="avatar" aria-hidden="true">
+                  {p.name.slice(0, 1).toUpperCase()}
+                </span>
+                <div>
+                  <strong>{p.name}</strong>{" "}
+                  {!p.active && <span className="badge">Inativo</span>}
+                  <div className="muted">
+                    {p.serviceIds.length === 0
+                      ? "Nenhum serviço vinculado"
+                      : `${p.serviceIds.length} ${p.serviceIds.length === 1 ? "serviço" : "serviços"}`}
+                  </div>
                 </div>
               </div>
               <Link
